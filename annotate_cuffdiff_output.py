@@ -271,7 +271,9 @@ for sig, label in zip([0.05, 2, 'yes'],['diff_p.05.xlsx','diff_all.xlsx','diff_s
         if sig == 'yes': 
             
             def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
-                        enr = DAVID_get('GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT', table_of_interest, name_vs_id_table)
+                if len(table_of_interest.index) >= 1:
+                    enr = DAVID_get('GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT', table_of_interest, name_vs_id_table)
+                    if len(enr.index) >= 1:
                         enr[enr['Category'] == 'GOTERM_BP_FAT'].to_excel(writer_bp, outshort+'_'+sheet_name, index=False)
                         enr[enr['Category'] == 'GOTERM_CC_FAT'].to_excel(writer_cc, outshort+'_'+sheet_name, index=False)
                         enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, outshort+'_'+sheet_name, index=False)
