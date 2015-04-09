@@ -1,12 +1,20 @@
 #!/bin/python
 
-"""This script annotates 'gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff', and 'isoform_exp.diff' cuffdiff tables. It generates 1 file for all results, 1 file for p<0.05, and 1 file for q<0.05. For significant values (i.e. q<0.05) it also generates tables containg all pair-wise comparisons in different sheets as well as gene ontology enrichment files for biological processes (BP), cellular component (CC), and moleculr function (MF)."""
+"""This script annotates 'gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff', and 'isoform_exp.diff' cuffdiff tables. It generates 1 file for all results, 1 file for p<0.05, and 1 file for q<0.05. For significant values (i.e. q<0.05) it also generates tables containg all pair-wise comparisons in different sheets as well as gene ontology enrichment files for biological processes (BP), cellular component (CC), and moleculr function (MF).
+    
+    USAGE: annotate_cuffdiff_output.py '/path/to/cuffdiff_output_folder' '/path/to/original.gtf' '/path/to/merged_and_compared.gtf' '/path/to/python_output_folder'
+    """
+
+
 
 import pandas as pd
 import numpy as np
 import os
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
+from sys import argv
+
+script_name, cuffdiff_output_folder, GTF_original, GTF_merged_compared, output_folder = argv
 
 
 ############### Check available BioMart data ######################
@@ -35,10 +43,10 @@ DAVID_id='WORMBASE_GENE_ID'
 
 
 ################### paths to files #########################
-diff_out = '/Users/jboucas/Desktop/Hanjie/cuffdiff_output'
-original_gtf = '/Users/jboucas/Desktop/Hanjie/WBcel235.78.gtf'
-merged_fixed_gtf = '/Users/jboucas/Desktop/Hanjie/cuffcmp.combined.gtf'
-python_output = 'python_out'
+diff_out = cuffdiff_output_folder
+original_gtf = GTF_original
+merged_fixed_gtf = GTF_merged_compared
+python_output = output_folder
 os.chdir(diff_out)
 
 if not os.path.exists(python_output):
