@@ -117,13 +117,22 @@ original=$(ls *dna.toplevel.fa)
 toplevel=${original#".fa"}
 toplevel=${toplevel%".fa"}
 
-bowtie2-build $original $toplevel
+
+# BOWTIE2 index
+
+bowtie2-build-s $original $toplevel
 
 gtf=$(ls *.gtf)
+
+
+# Fix GTF with cuffcompare
 
 cuffcompare -V -s chromosomes -r $gtf $gtf
 
 mv cuffcmp.combined.gtf cuffcmp_GTF.$gtf
+
+
+# Generate TOPHAT transcriptome indexes
 
 mkdir cuffcmp_GTF_index
 tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index $toplevel
@@ -133,6 +142,18 @@ tophat2 -G $gtf --transcriptome-index GTF_index $toplevel
 rm -r tophat_out
 
 tar -jcvf cuffcmp.results.tar.bz2 cuffcmp.* --remove-files
+
+
+# STAR index creation
+
+full_path=$(pwd)
+
+STAR --runMode genomeGenerate --genomeDir ${full_path} --genomeFastaFiles ${original} --runThreadN 2 --sjdbGTFfile ${gtf} --sjdbOverhang 100
+
+
+# BWA index creation
+bwa index -a bwtsw -p ${full_path} ${original}
+
 
 else
 
