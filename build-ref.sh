@@ -14,7 +14,7 @@
 
 # example tophat options: 
 # --transcriptome-index $references_directory/caenorhabditis_elegans/WBcell235_78/GTF_cuffcmp_GTF_index 
-# for the reference indexed genome use $references_directory/caenorhabditis_elegans/WBcell235_78/WBcel235.dna.toplevel
+# for the reference indexed genome use $references_directory/caenorhabditis_elegans/WBcell235_78/bowtie2/WBcel235.dna.toplevel
 
 # example cufflinks options:
 # -g $references_directory/caenorhabditis_elegans/WBcell235_78/cuffcmp_GTF.WBcel235.78.gtf
@@ -111,7 +111,7 @@ chrp2=$(echo $file | cut -f5 -d.)
 sep=.
 chr=$chrp1$sep$chrp2
 
-mv $file chromosomes/$chr; done
+mv ${file} chromosomes/${chr}; done
 
 original=$(ls *dna.toplevel.fa)
 toplevel=${original#".fa"}
@@ -119,15 +119,18 @@ toplevel=${toplevel%".fa"}
 
 
 # BOWTIE2 index
+mkdir bowtie2
+cd bowtie2
+ln -s ../${original} ${original}
 
 bowtie2-build-s $original $toplevel
 
+cd ..
 gtf=$(ls *.gtf)
-
 
 # Fix GTF with cuffcompare
 
-cuffcompare -V -s chromosomes -r $gtf $gtf
+cuffcompare -V -CG -s chromosomes -r $gtf $gtf
 
 mv cuffcmp.combined.gtf cuffcmp_GTF.$gtf
 
@@ -135,9 +138,10 @@ mv cuffcmp.combined.gtf cuffcmp_GTF.$gtf
 # Generate TOPHAT transcriptome indexes
 
 mkdir cuffcmp_GTF_index
-tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index $toplevel
+tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index bowtie2/$toplevel
+
 mkdir GTF_index
-tophat2 -G $gtf --transcriptome-index GTF_index $toplevel
+tophat2 -G $gtf --transcriptome-index GTF_index bowtie2/$toplevel
 
 rm -r tophat_out
 
@@ -146,14 +150,22 @@ tar -jcvf cuffcmp.results.tar.bz2 cuffcmp.* --remove-files
 
 # STAR index creation
 
+mkdir star
+cd star
 full_path=$(pwd)
-
+ln -s ../${original} ${original}
+ln -s ../${gtf} ${gtf}
 STAR --runMode genomeGenerate --genomeDir ${full_path} --genomeFastaFiles ${original} --runThreadN 2 --sjdbGTFfile ${gtf} --sjdbOverhang 100
-
+cd ..
 
 # BWA index creation
-bwa index -a bwtsw -p ${full_path} ${original}
 
+mkdir bwa
+cd bwa
+full_path=$(pwd)
+ln -s ../${original} ${original}
+bwa index -a bwtsw -p ${full_path}/${original::(-3)} ${original}
+cd ..
 
 else
 
