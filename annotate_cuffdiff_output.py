@@ -8,14 +8,17 @@ import argparse
 import os
 import sys
 
+sys.stdout.flush()
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-D", "--DAVID", help="Use this flag to perform DAVID GO enrichment analysis", action="store_true")
 parser.add_argument("-i", "--inputFolder", help="Cuffdiff output folder")
 parser.add_argument("-o", "--outputFolder", help="Output folder")
 parser.add_argument("-G", "--originalGTF", help="Origianl/downloaded GTF")
-parser.add_argument("-C", "--cuffcompareGTF", help="cuffcompared GTF")
+parser.add_argument("-C", "--cuffcompareGTF", help="Merged cuffcompared GTF")
 parser.add_argument("-f", "--inputFiles", help="Implies -s. Use this option to select which *.diff files you wish to analyse. Default: 'gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff'.", default='gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff')
 parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. Default: 'geneexp prom splic cds iso'.", default='geneexp prom splic cds iso')
+parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-labeled significantly changed genes", action="store_true")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
 parser.add_argument("--mart", help="Your mart of choice. Default='ensembl'", default='ensembl')
@@ -68,11 +71,27 @@ if args.listAttributes:
 
                     
 print "\nInput folder: "+args.inputFolder
-print "\nOutput folder: "+args.outputFolder
-print "\nOriginal GTF: "+args.originalGTF
-print "\nCuffcompare curated GTF: "+args.cuffcompareGTF
-print "\nFiles being analysed: "+args.inputFiles
-print "\nShort output labels: "+args.shortOutputName
+sys.stdout.flush()
+print "Output folder: "+args.outputFolder
+sys.stdout.flush()
+print "Original GTF: "+args.originalGTF
+sys.stdout.flush()
+print "Cuffcompare curated GTF: "+args.cuffcompareGTF
+sys.stdout.flush()
+print "Files being analysed: "+args.inputFiles
+sys.stdout.flush()
+print "Short output labels: "+args.shortOutputName
+sys.stdout.flush()
+
+if args.sigOnly:
+    print "\nReporting only significantly changed genes"
+    sig_choice = ['yes']
+    label_choice = ['diff_sig']
+else:
+    sig_choice = [0.05, 2, 'yes']
+    label_choice = ['diff_p.05','diff_all','diff_sig']
+
+
 
 if args.DAVID:
     print "\nPerforming DAVID GO enrichment analysis"
@@ -80,6 +99,7 @@ if args.DAVID:
 else:
     print "\nUse -D if you want to perform DAVID GO enrichment analysis"
 
+sys.stdout.flush()
 
 in_files=args.inputFiles
 in_files=in_files.split()
@@ -130,7 +150,10 @@ if not os.path.exists(python_output):
 
 if os.path.isfile(python_output+'/genes_table.txt'):
     print "\nUsing already existing list of gene names and ids"
+    sys.stdout.flush()
 else:
+    print "\nGetting list of gene names and respective ids present in the data set"
+    sys.stdout.flush()
     genes = pd.DataFrame()
     for file in ['gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff', 'isoform_exp.diff']:
         df = pd.read_table(file)
@@ -140,22 +163,35 @@ else:
     genes = pd.DataFrame(genes.gene.str.split(',').tolist())[0]
     genes = genes.drop_duplicates()
     genes = genes.tolist()
+    print "Imported list of differentially regulated genes"
+    sys.stdout.flush()
 
-    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None)
+    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None, dtype=str)
+    print "GTF imported"
+    sys.stdout.flush()
+    gtf = gtf.astype(str)
+
     gene_name = pd.DataFrame(gtf[8].str.split('gene_name').tolist())[1]
+    gene_name = gene_name.astype(str)
     gene_name = pd.DataFrame(gene_name.str.split(';',1).tolist())
     gene_name = pd.DataFrame(gene_name[0].str.split('"').tolist())[1]
     gene_name = pd.DataFrame(gene_name)
-            
+    print "Read gene names from GTF"
+    sys.stdout.flush()    
+
     gene_id = pd.DataFrame(gtf[8].str.split('gene_id').tolist())[1]
     gene_id = gene_id.astype(str)
     gene_id = pd.DataFrame(gene_id.str.split(';',1).tolist())
     gene_id = pd.DataFrame(gene_id[0].str.split('"').tolist())[1]
     gene_id = pd.DataFrame(gene_id)
-
+    print "Read gene ids from GTF"
+    sys.stdout.flush()
+    
     name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
     name_id.columns = ['g_name','g_id']
     name_id = name_id[name_id['g_name'].isin(genes)]
+    print "Generated Names/IDs table"
+    sys.stdout.flush()
 
     genes = name_id['g_id'].tolist()
 
@@ -168,7 +204,10 @@ else:
 
 if os.path.isfile(python_output+'/biotypes_go_raw.txt'):
     print "\nUsing already existing biotypes_go_raw.txt file"
+    sys.stdout.flush()
 else:
+    print "\nRetrieving biotypes and gene ontoloy information"
+    sys.stdout.flush()
     biomaRt = importr("biomaRt")
     ensemblMart=biomaRt.useMart(args.mart)
     ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
@@ -182,7 +221,10 @@ else:
                 
 if os.path.isfile(python_output+'/biotypes_go.txt'):
     print "\nUsing already existing biotypes_go.txt file"
+    sys.stdout.flush()
 else:
+    print "\nGenerating final biotypes and GO terms table"
+    sys.stdout.flush()
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
     ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
     ontology.columns = ['g_id','gene_biotype','GO_id','GO_term']
@@ -319,20 +361,26 @@ def DAVID_get(cat, filtered_table, all_genes_table):
 
 
 # create excel report tables
+print "\nCreating excel report tables"
+sys.stdout.flush()
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
 
-for sig, label in zip([0.05, 2, 'yes'],['diff_p.05.xlsx','diff_all','diff_sig']):
+for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
         writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
-    
-    
+        print "\nWritting table "+label+".xlsx"
+        sys.stdout.flush()
     for imp, outshort in zip(in_files, out_labels):
-        
+	print "\nWorking on "+imp        
+        sys.stdout.flush()
+
         if sig == 'yes':
             writer = pd.ExcelWriter(python_output+'/'+label+'_'+outshort+'.xlsx')
+            print "Writting table "+label+"_"+outshort+".xlsx"            
+            sys.stdout.flush()
             if args.DAVID:
                 writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
                 writer_cc = pd.ExcelWriter(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
@@ -397,6 +445,8 @@ for sig, label in zip([0.05, 2, 'yes'],['diff_p.05.xlsx','diff_all','diff_sig'])
                                 os.makedirs(sample1+sample2)
                                 df_pair = df[df['sample_1'].isin([sample1,sample2])][df['sample_2'].isin([sample1,sample2])]
                                 if args.DAVID:
+                                    print "\nPerforming gene ontology enrichment analysis on "+sample1+' vs. '+sample2 
+				    sys.stdout.flush()
                                     DAVID_write(df_pair, name_id, sample1+'|'+sample2)
             
                                 df_pair.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
