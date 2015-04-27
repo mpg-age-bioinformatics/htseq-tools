@@ -1,5 +1,65 @@
 #!/bin/bash
 
+"This script needs to run form inside the folder scripts in a working project with the following structure:
+project/scripts
+project/raw_data
+
+
+Raw data needs to be labeled in the following fashion:
+
+Sample_serial-Folder-Line-Time_point/day_of_life(day_post_Treament)-treament-REPlicate-READ
+
+and with the exact number of characters as in the example bellow:
+
+S_001-F_HaTS-L____N2-__0-____-REP_1-READ_1.fastq.gz
+
+S_XXX-F_XXXX-L_XXXXX-XXX-XXXX-REP_X-READ_x.fastq.gz
+
+Please notice that for paired samples, the S_XXX is the same.
+
+
+Please make sure you have pigz and unpigz in you path.
+
+Make sure you have edited the last section of this script - cuffdiff - before you execute this script."
+
+
+
+
+#############################################################################
+
+# Define series as SE or PE and stranded or unstranded
+
+SE_unstr=("YiTS" "YiDR" "YiIS" "ShTe")
+SE_str=("Yid1" "OeDA" "AgMi")
+PE_str=("RoSt" "HaTS" "HaIS")
+mix=("Yid3")
+
+unstr=("YiTS" "YiDR" "YiIS" "ShTe")
+str=("Yid1" "OeDA" "RoSt" "HaTS" "HaIS" "AgMi" )
+#mix=("Yid3")
+
+
+# Which series do you which to work on:
+
+series="AgMi"
+
+# Reference genome
+
+ann=/data/genomes/mus_musculus/GRCm38_79
+ori_GTF=$(readlink -f  ${ann}/*.gtf)
+GTF_file=$(readlink -f ${ann}/cuffcmp_GTF.*.gtf)
+GTF_index=$(readlink -f ${ann}/cuffcmp_GTF_index/*.gff)
+GTF_index=${GTF_index::(-4)}
+genome=$(ls ${ann}/bowtie2/*dna.toplevel.fa)
+genomeN=${genome::(-3)}
+
+adapters_file=full_path_to_adapters_file_for_flexbar_to_use
+
+
+#############################################################################
+
+
+
 echo "Creating required folders"
 mkdir ../slurm_logs
 mkdir ../fastqc
@@ -19,17 +79,6 @@ cli=$(readlink -f ../cufflinks_output)/
 qua=$(readlink -f ../cuffquant_output)/
 merg=$(readlink -f ../cuffmerge_output)/
 
-# Reference genome
-
-ann=/data/genomes/mus_musculus/GRCm38_79
-ori_GTF=$(readlink -f  ${ann}/*.gtf)
-GTF_file=$(readlink -f ${ann}/cuffcmp_GTF.*.gtf)
-GTF_index=$(readlink -f ${ann}/cuffcmp_GTF_index/*.gff)
-GTF_index=${GTF_index::(-4)}
-genome=$(ls ${ann}/bowtie2/*dna.toplevel.fa)
-genomeN=${genome::(-3)}
-
-
 # Required function
 
 function contains() {
@@ -44,23 +93,6 @@ function contains() {
     echo "n"
     return 1
 }
-
-
-# Define series as SE or PE and stranded or unstranded
-
-SE_unstr=("YiTS" "YiDR" "YiIS" "ShTe")
-SE_str=("Yid1" "OeDA" "AgMi")
-PE_str=("RoSt" "HaTS" "HaIS")
-mix=("Yid3")
-
-unstr=("YiTS" "YiDR" "YiIS" "ShTe")
-str=("Yid1" "OeDA" "RoSt" "HaTS" "HaIS" "AgMi" )
-#mix=("Yid3")
-
-
-# Which series do you which to work on:
-
-series="AgMi"
 
 #############################################################################
 
@@ -111,9 +143,11 @@ if [[ -e ${file::(-7)}2.fastq ]]; then
 
 echo "#!/bin/bash 
 
+module load Flexbar
+
 flexbar -r ${tmp}${file::(-7)}1.fastq \
 -p ${tmp}${file::(-7)}2.fastq -t ${top}raw_trimmed/${file::(-8)} \
--n 20 -a ${top}others/TruSeqAdapters.txt \
+-n 20 -a ${adapters_file} \
 -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
 cd ${top}raw_trimmed
 pigz -p 10 ${file::(-7)}1.fastq
@@ -124,6 +158,9 @@ rm ${tmp}flexbar_${file::(-5)}sh" > ${tmp}flexbar_${file::(-5)}sh
 else
 
 echo "#!/bin/bash
+
+module load Flexbar
+
 flexbar -r ${tmp}${file::(-7)}1.fastq \
 -t ${top}raw_trimmed/${file::(-6)} \
 -n 20 -a ${top}others/TruSeqAdapters.txt \
@@ -193,14 +230,15 @@ fi
 
 echo "#!/bin/bash
 cd ${rawt}
-
-/software/TopHat/2.0.13/tophat2 -p 20 --library-type ${lib} \
+module load TopHat
+tophat -p 20 --library-type ${lib} \
 --transcriptome-index ${GTF_index} \
 -o ${top}tophat_output/${file::(-16)} \
 ${genomeN} \
 ${files}
 
-/software/Cufflinks/2.2.1/cufflinks -p 20 --library-type ${lib} \
+module load Cufflinks
+cufflinks -p 20 --library-type ${lib} \
 -g ${GTF_file} --no-faux-reads \
 -o ${top}cufflinks_output/${file::(-16)} \
 ${top}tophat_output/${file::(-16)}/accepted_hits.bam
@@ -238,6 +276,7 @@ cmout=$(readlink -f cuffmerge_output/${serie})/
 echo ${serie}
 
 cd ${top}
+module load Cufflinks
 srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 -o ${cmout} \
 -g ${GTF_file} -s ${genome} ${tmp}assemblies_${serie}.txt
 
@@ -245,6 +284,7 @@ cd ${cmout}
 mkdir cuffcompare_output
 cd cuffcompare_output
 echo "STARTING CUFFCOMPARE"
+module load Cufflinks
 srun -p himem,hugemem,blade --cpus-per-task=2 cuffcompare -C -r ${ori_GTF} -s ${ann}/chromosomes ${cmout}merged.gtf
 done
 
@@ -280,6 +320,7 @@ for file in $(ls -d *${serie}*); do echo "#!/bin/bash
 cd ${top}cuffquant_output
 mkdir ${serie}
 cd ${serie}
+module load Cufflinks
 cuffquant -p 20 --library-type ${lib} \
 -o ${file} \
 ${top}cuffmerge_output/${serie}/cuffcompare_output/cuffcmp.combined.gtf \
@@ -313,6 +354,9 @@ lib="fr-firststrand"
 
 echo "#!/bin/bash
 cd ${qua}${serie}
+
+module load Cufflinks
+
 cuffdiff -p 20 --library-type ${lib} \
 -L liver_10M,heart_10M,cereb_10M,hippo_10M,liver_27M,heart_27M,cereb_27M,hippo_27M \
 -o ${dout} --dispersion-method per-condition \
