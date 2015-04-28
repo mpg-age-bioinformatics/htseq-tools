@@ -332,7 +332,7 @@ chmod 755 ${tmp}quant_${file}.sh
 rm ../slurm_logs/quant_${file}.*.out
 sbatch -p blade,himem,hugemem --cpus-per-task=20 -o ../slurm_logs/quant_${file}.%j.out ${tmp}quant_${file}.sh 2>&1 | tee ${tmp}quant_${file}.id
 id=$(cat ${tmp}quant_${file}.id | grep 'Submitted batch job')
-echo -n :${id:20} >> ${tmp}quantids
+echo -n :${id:20} >> ${tmp}quant.ids
 rm ${tmp}quant_${file}.id
 done
 done
@@ -343,7 +343,7 @@ srun -p blade,himem,hugemem -d afterok${quant_ids} echo "Starting cuffdiff"
 
 #############################################################################
 
-
+echo "Starting cuffdiff"
 
 #### cuff diff >>>> one section per serie ######
 
