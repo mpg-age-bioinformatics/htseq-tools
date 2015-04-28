@@ -1,170 +1,383 @@
 #!/bin/bash
 
-#  all_in_one.sh
-#  
-#
-#  Created by JBoucas on 30/01/15.
-#
+"This script needs to run form inside the folder scripts in a working project with the following structure:
+project/scripts
+project/raw_data
 
-#rm -r ../tmp
-#rm -r ../slurm_logs
-#rm -r ../fastqc
-#rm -r ../raw_trimmed
-#rm -r ../tophat_output
-#rm -r ../cufflinks_output
-#rm -r ../cuffdiff_output
-#rm -r ../cuffmerge_output
-rm ../assemblies.txt
 
-mkdir ../tmp
+Raw data needs to be labeled in the following fashion:
+
+Sample_serial-Folder-Line-Time_point/day_of_life(day_post_Treament)-treament-REPlicate-READ
+
+and with the exact number of characters as in the example bellow:
+
+S_001-F_HaTS-L____N2-__0-____-REP_1-READ_1.fastq.gz
+
+S_XXX-F_XXXX-L_XXXXX-XXX-XXXX-REP_X-READ_x.fastq.gz
+
+Please notice that for paired samples, the S_XXX is the same.
+
+
+Please make sure you have pigz and unpigz in you path.
+
+Make sure you have edited the last section of this script - cuffdiff - before you execute this script."
+
+
+
+
+#############################################################################
+
+# Define series as SE or PE and stranded or unstranded
+
+SE_unstr=("YiTS" "YiDR" "YiIS" "ShTe")
+SE_str=("Yid1" "OeDA" "AgMi")
+PE_str=("RoSt" "HaTS" "HaIS")
+mix=("Yid3")
+
+unstr=("YiTS" "YiDR" "YiIS" "ShTe")
+str=("Yid1" "OeDA" "RoSt" "HaTS" "HaIS" "AgMi" )
+#mix=("Yid3")
+
+
+# Which series do you which to work on:
+
+series="AgMi"
+
+# Reference genome
+
+ann=/data/genomes/mus_musculus/GRCm38_79
+ori_GTF=$(readlink -f  ${ann}/*.gtf)
+GTF_file=$(readlink -f ${ann}/cuffcmp_GTF.*.gtf)
+GTF_index=$(readlink -f ${ann}/cuffcmp_GTF_index/*.gff)
+GTF_index=${GTF_index::(-4)}
+genome=$(ls ${ann}/bowtie2/*dna.toplevel.fa)
+genomeN=${genome::(-3)}
+
+adapters_file=full_path_to_adapters_file_for_flexbar_to_use
+
+
+#############################################################################
+
+
+
+echo "Creating required folders"
 mkdir ../slurm_logs
 mkdir ../fastqc
-mkdir ../raw_trimmed
+mkdir ../tmp
 mkdir ../tophat_output
 mkdir ../cufflinks_output
+mkdir ../raw_trimmed
+mkdir ../cuffmerge_output
+mkdir ../cuffquant_output
 mkdir ../cuffdiff_output
 
 top=$(readlink -f ../)/
 tmp=$(readlink -f ../tmp)/
-raw=$(readlink -f ../raw)/
+raw=$(readlink -f ../raw_data)/
 rawt=$(readlink -f ../raw_trimmed)/
-ann=/data/refs/caenorhabditis_elegans/WBcel235_78
+cli=$(readlink -f ../cufflinks_output)/
+qua=$(readlink -f ../cuffquant_output)/
+merg=$(readlink -f ../cuffmerge_output)/
 
-# 1st step: fastqc
+# Required function
 
-cd $raw
+function contains() {
+    local n=$#
+    local value=${!n}
+    for ((i=1;i < $#;i++)) {
+        if [ "${!i}" == "${value}" ]; then
+            echo "y"
+            return 0
+        fi
+    }
+    echo "n"
+    return 1
+}
 
-for file in $(ls *.fq.gz); do echo "#!/bin/bash
-cp $raw$file $tmp
-cd $tmp
-gunzip $file
-fastqc -t 2 -o ../fastqc ${file::(-3)}
-rm ${file::(-3)}
-rm ${file::(-15)}_fastqc.sh" > $tmp${file::(-15)}_fastqc.sh
+#############################################################################
 
-cd $tmp
-chmod 755 ${file::(-15)}_fastqc.sh
-rm ${file::(-15)}_fastqc.id
-rm ../slurm_logs/fastqc.${file::(-15)}.*.out
-sbatch -o ../slurm_logs/fastqc.${file::(-15)}.%j.out ${file::(-15)}_fastqc.sh 2>&1 | tee ${file::(-15)}_fastqc.id
+echo "Starting FASTQC"
 
+cd ${raw} 
+
+if [[ -e ${tmp}fastqc.ids ]]; then
+rm ${tmp}fastqc.ids
+fi
+
+for serie in $series; do 
+for file in $(ls *${serie}*.fastq.gz); do echo "#!/bin/bash
+module load FastQC
+cp ${raw}${file} ${tmp}
+cd ${tmp}
+unpigz -p 10 ${file}
+fastqc -t 10 -o ../fastqc ${file::(-3)}
+rm ${tmp}fastqc_${file::(-9)}.sh" > ${tmp}fastqc_${file::(-9)}.sh
+
+cd ${tmp} 
+chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
+rm ../slurm_logs/fastqc_${file::(-9)}.*.out
+sbatch -p blade,himem,hugemem --cpus-per-task=10 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh 2>&1 | tee ${tmp}fastqc_${file::(-2)}id
+
+id=$(cat ${tmp}fastqc_${file::(-2)}id | grep 'Submitted batch job')
+echo -n :${id:20} >> ${tmp}fastqc.ids
+rm ${tmp}fastqc_${file::(-2)}id
+done
 done
 
-pause 3
+fastqc_ids=$(cat ${tmp}fastqc.ids)
+srun -p blade,himem,hugemem -d afterok${fastqc_ids} echo "FASTQC done"
 
-# capture fastqc job ids
+#############################################################################
 
-cd $tmp
-rm all_fastqc.id
-for file in $(ls *_fastqc.id); do
-id=$(cat $file | grep 'Submitted batch job')
-echo -n :${id:20} >> all_fastqc.id
-done
-ids=$(cat all_fastqc.id)
+cd ${tmp}
+
+if [[ -e ${tmp}flexbar.ids ]]; then
+rm ${tmp}flexbar.ids
+fi
 
 
-# 2nd step: flexbar
+for serie in $series; do
+for file in $(ls *${serie}*1.fastq); do
 
-cd $raw
+if [[ -e ${file::(-7)}2.fastq ]]; then
 
-for file in $(ls *1_sequence.fq.gz); do echo "#!/bin/bash
+echo "#!/bin/bash 
 
-flexbar -r $raw${file::(-16)}1_sequence.fq.gz -p $raw${file::(-16)}2_sequence.fq.gz -t ../raw_trimmed/${file::(-17)} -n 32 -a ~/documents/TruSeqAdapters.txt -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+module load Flexbar
 
-cd $top
-gzip raw_trimmed/${file::(-17)}_1.fastq
-gzip raw_trimmed/${file::(-17)}_2.fastq
-rm $tmp${file::(-17)}_flexbar.sh" > $tmp${file::(-17)}_flexbar.sh
+flexbar -r ${tmp}${file::(-7)}1.fastq \
+-p ${tmp}${file::(-7)}2.fastq -t ${top}raw_trimmed/${file::(-8)} \
+-n 20 -a ${adapters_file} \
+-ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+cd ${top}raw_trimmed
+pigz -p 10 ${file::(-7)}1.fastq
+pigz -p 10 ${file::(-7)}2.fastq
 
-cd $tmp
-chmod 755 ${file::(-17)}_flexbar.sh
-rm ../slurm_logs/flexbar.${file::(-17)}.*.out
-rm ${file::(-17)}_flexbar.id
-sbatch -d afterok$ids --cpus-per-task=40 --mem=64 -o ../slurm_logs/flexbar.${file::(-17)}.%j.out ${file::(-17)}_flexbar.sh 2>&1 | tee ${file::(-17)}_flexbar.id
+rm ${tmp}flexbar_${file::(-5)}sh" > ${tmp}flexbar_${file::(-5)}sh
 
-done
-
-pause 3
-
-# capture flexbar job ids
-
-cd $tmp
-rm all_flexbar.id
-for file in $(ls *_flexbar.id); do
-id=$(cat $file | grep 'Submitted batch job')
-echo -n :${id:20} >> all_flexbar.id
-done
-ids=$(cat all_flexbar.id)
-
-# 3rd step: tophat and cufflinks
-
-cd $raw
-
-for file in $(ls *1_sequence.fq.gz); do echo "#!/bin/bash
-
-tophat2 -p 40 --library-type fr-firststrand --transcriptome-index $ann/cuffcmp_GTF_index/cuffcmp_GTF.WBcel235.78 -o ../tophat_output/${file::(-17)} $ann/WBcel235.dna.toplevel $rawt${file::(-16)}1.fastq.gz $rawt${file::(-16)}2.fastq.gz
-
-cufflinks -p 40 --library-type fr-firststrand -g $ann/cuffcmp_GTF.WBcel235.78.gtf --no-faux-reads -o ../cufflinks_output/${file::(-17)} ../tophat_output/${file::(-17)}/accepted_hits.bam
-
-rm ${file::(-17)}_th_cl.sh" > $tmp${file::(-17)}_th_cl.sh
-
-cd $tmp
-chmod 755 ${file::(-17)}_th_cl.sh
-rm ../slurm_logs/th_cl.${file::(-17)}.*.out
-rm ${file::(-17)}_th_cl.id
-sbatch -d afterok$ids --cpus-per-task=40 -o ../slurm_logs/th_cl.${file::(-17)}.%j.out ${file::(-17)}_th_cl.sh 2>&1 | tee ${file::(-17)}_th_cl.id
-
-done
-
-pause 3
-
-# capture tophat_cufflins job ids
-
-cd $tmp
-rm all_th_cl.id
-for file in $(ls *_th_cl.id); do
-id=$(cat $file | grep 'Submitted batch job')
-echo -n :${id:20} >> all_th_cl.id
-done
-ids=$(cat all_th_cl.id)
-
-# 4th step: select transcripts with full read coverage, cuffmerge, cuffcompare merged GTF with ensembl GTF, cuffdiff
+else
 
 echo "#!/bin/bash
 
-cd $raw
-for file in $(ls *1_sequence.fq.gz); do
-cd $top
-cd tophat_output
-mv ${file::(-17)} ${file:16:(-17)}
-cd ../cufflinks_output
-mv ${file::(-17)} ${file:16:(-17)}
-cat ${file:16:(-17)}/transcripts.gtf | grep yes > ${file:16:(-17)}/transcripts_full_read.gtf
-echo 'cufflinks_output/${file:16:(-17)}/transcripts_full_read.gtf' >> ../assemblies.txt
+module load Flexbar
+
+flexbar -r ${tmp}${file::(-7)}1.fastq \
+-t ${top}raw_trimmed/${file::(-6)} \
+-n 20 -a ${top}others/TruSeqAdapters.txt \
+-ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+cd ${top}raw_trimmed
+pigz -p 10 ${file}
+rm ${tmp}flexbar_${file::(-5)}sh" > ${tmp}flexbar_${file::(-5)}sh
+
+fi
+
+cd ${tmp}
+chmod 755 ${tmp}flexbar_${file::(-5)}sh
+rm ../slurm_logs/flexbar_${file::(-5)}*.out
+sbatch -p blade,himem,hugemem --cpus-per-task=20 -o ../slurm_logs/flexbar_${file::(-5)}%j.out ${tmp}flexbar_${file::(-5)}sh 2>&1 | tee ${tmp}flexbar_${file::(-5)}id
+id=$(cat ${tmp}flexbar_${file::(-5)}id | grep 'Submitted batch job')
+echo -n :${id:20} >> ${tmp}flexbar.ids
+rm ${tmp}flexbar_${file::(-5)}id
+done
 done
 
-cd $top
+flexbar_ids=$(cat ${tmp}flexbar.ids)
+srun -p blade,himem,hugemem -d afterok${flexbar_ids} echo "FLEXBAR done"
 
-cuffmerge -g $ann/cuffcmp_GTF.WBcel235.78.gtf -s $ann/WBcel235.dna.toplevel.fa -o cuffmerge_output -p 40 assemblies.txt
 
-rm assemblies.txt
-mkdir cuffmerge_output/cuffcompare_output
-cd cuffmerge_output/cuffcompare_outputt
+#############################################################################
 
-cuffcompare -V -CG -r $ann/WBcel235.78.gtf -s $ann/chromosomes ../merged.gtf
 
-cd $top
-cd tophat_output
+if [[ -e ${tmp}assemblies.txt ]]; then
+rm ${tmp}assemblies.txt
+fi
+if [[ -e ${tmp}th_cl.ids ]]; then
+rm ${tmp}${tmp}th_cl.ids
+fi
 
-cuffdiff -o ../cuffdiff_output -p 40 -L day_0,day_7,day_14,day_21 -u ../cuffmerge_output/cuffcompare_output/cuffcmp.combined.gtf BR1_0/accepted_hits.bam,BR2_0/accepted_hits.bam,BR3_0/accepted_hits.bam BR1_7/accepted_hits.bam,BR2_7/accepted_hits.bam,BR3_7/accepted_hits.bam BR1_14/accepted_hits.bam,BR2_14/accepted_hits.bam,BR3_14/accepted_hits.bam BR1_21/accepted_hits.bam,BR2_21/accepted_hits.bam,BR3_21/accepted_hits.bam
 
-rm cuffmerge_diff.sh
-rm -r ../tmp" > cuffmerge_diff.sh
+cd ${rawt}
 
-cd $top
-cd tophat_output
-chmod 755 cuffmerge_diff.sh
-rm ../slurm_logs/cuffmerge_diff.*.out
-sbatch -d afterok$ids --cpus-per-task=40 -o ../slurm_logs/cuffmerge_diff.%j.out cuffmerge_diff.sh
+
+for serie in $series; do
+for file in $(ls *${serie}*1.fastq.gz); do 
+
+
+series=${file:8:4}
+
+if [[ $(contains "${SE_unstr[@]}" "$series") == "y" ]]; then
+lib="fr-unstranded"
+files=${file}
+
+elif [[ $(contains "${SE_str[@]}" "$series") == "y" ]]; then
+lib="fr-firststrand"
+files=${file}
+
+elif [[ $(contains "${PE_str[@]}" "$series") == "y" ]]; then
+lib="fr-firststrand"
+files="${file} ${file::(-10)}2.fastq.gz"
+
+elif [[ $(contains "${mix[@]}" "$series") == "y" ]]; then
+files=${file}
+REP=${file:30:5}
+
+if [[ ${REP} == REP_3 ]]; then
+lib="fr-firststrand"
+else
+lib="fr-unstranded"
+fi
+fi
+
+echo "#!/bin/bash
+cd ${rawt}
+module load TopHat
+tophat -p 20 --library-type ${lib} \
+--transcriptome-index ${GTF_index} \
+-o ${top}tophat_output/${file::(-16)} \
+${genomeN} \
+${files}
+
+module load Cufflinks
+cufflinks -p 20 --library-type ${lib} \
+-g ${GTF_file} --no-faux-reads \
+-o ${top}cufflinks_output/${file::(-16)} \
+${top}tophat_output/${file::(-16)}/accepted_hits.bam
+
+cat ${top}cufflinks_output/${file::(-16)}/transcripts.gtf | grep yes > ${top}cufflinks_output/${file::(-16)}/transcripts_full_read.gtf
+
+rm ${tmp}th_cl_${file::(-16)}.sh" > ${tmp}th_cl_${file::(-16)}.sh
+
+cd ${tmp}
+chmod 755 ${tmp}th_cl_${file::(-16)}.sh 
+rm ../slurm_logs/th_cl_${file::(-16)}.*.out
+sbatch -p blade,himem,hugemem --cpus-per-task=20 -o ../slurm_logs/th_cl_${file::(-16)}.%j.out ${tmp}th_cl_${file::(-16)}.sh 2>&1 | tee ${tmp}th_cl_${file::(-16)}.id
+id=$(cat ${tmp}th_cl_${file::(-16)}.id | grep 'Submitted batch job')
+echo -n :${id:20} >> ${tmp}th_cl.ids
+rm ${tmp}th_cl_${file::(-16)}.id
+echo "cufflinks_output/${file::(-16)}/transcripts_full_read.gtf" >> ${tmp}assemblies.txt
+
+done
+
+th_cl_ids=$(cat ${tmp}th_cl.ids)
+srun -p blade,himem,hugemem -d afterok${th_cl_ids} echo "TopHat and Cufflinks done"
+
+#############################################################################
+
+
+echo "Starting cuffmerge"
+
+for serie in $series; do
+
+cat ${tmp}assemblies.txt | grep ${serie} > ${tmp}assemblies_${serie}.txt
+
+cd ${top}
+mkdir cuffmerge_output/${serie}
+cmout=$(readlink -f cuffmerge_output/${serie})/
+echo ${serie}
+
+cd ${top}
+module load Cufflinks
+srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 -o ${cmout} \
+-g ${GTF_file} -s ${genome} ${tmp}assemblies_${serie}.txt
+
+cd ${cmout}
+mkdir cuffcompare_output
+cd cuffcompare_output
+echo "STARTING CUFFCOMPARE"
+module load Cufflinks
+srun -p himem,hugemem,blade --cpus-per-task=2 cuffcompare -C -r ${ori_GTF} -s ${ann}/chromosomes ${cmout}merged.gtf
+done
+
+cd ${tmp}
+cd ../scripts
+
+#############################################################################
+
+echo "Starting cuffquant"
+
+if [[ -e ${tmp}quant.ids ]]; then
+rm ${tmp}${tmp}quant.ids
+fi
+
+
+for serie in $series; do
+
+if [[ $(contains "${unstr[@]}" "$serie") == "y" ]]; then
+lib="fr-unstranded"
+
+elif [[ $(contains "${str[@]}" "$serie") == "y" ]]; then
+lib="fr-firststrand"
+
+
+elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
+lib="fr-unstranded"
+
+fi
+
+cd ${top}tophat_output
+
+for file in $(ls -d *${serie}*); do echo "#!/bin/bash
+cd ${top}cuffquant_output
+mkdir ${serie}
+cd ${serie}
+module load Cufflinks
+cuffquant -p 20 --library-type ${lib} \
+-o ${file} \
+${top}cuffmerge_output/${serie}/cuffcompare_output/cuffcmp.combined.gtf \
+${top}tophat_output/${file}/accepted_hits.bam
+rm ${tmp}quant_${file}.sh" > ${tmp}quant_${file}.sh
+
+cd ${tmp}
+chmod 755 ${tmp}quant_${file}.sh
+rm ../slurm_logs/quant_${file}.*.out
+sbatch -p blade,himem,hugemem --cpus-per-task=20 -o ../slurm_logs/quant_${file}.%j.out ${tmp}quant_${file}.sh 2>&1 | tee ${tmp}quant_${file}.id
+id=$(cat ${tmp}quant_${file}.id | grep 'Submitted batch job')
+echo -n :${id:20} >> ${tmp}quant.ids
+rm ${tmp}quant_${file}.id
+done
+done
+quant_ids=$(cat ${tmp}quant.ids)
+
+srun -p blade,himem,hugemem -d afterok${quant_ids} echo "Starting cuffdiff"
+
+
+#############################################################################
+
+echo "Starting cuffdiff"
+
+#### cuff diff >>>> one section per serie ######
+
+serie=AgMi
+mkdir ${top}cuffdiff_output/${serie}
+dout=$(readlink -f ${top}cuffdiff_output/${serie})
+lib="fr-firststrand"
+
+echo "#!/bin/bash
+cd ${qua}${serie}
+
+module load Cufflinks
+
+cuffdiff -p 20 --library-type ${lib} \
+-L liver_10M,heart_10M,cereb_10M,hippo_10M,liver_27M,heart_27M,cereb_27M,hippo_27M \
+-o ${dout} --dispersion-method per-condition \
+${top}cuffmerge_output/${serie}/cuffcompare_output/cuffcmp.combined.gtf \
+S_001-F_AgMi-L_live-_10-____-REP_1/abundances.cxb,S_005-F_AgMi-L_live-_10-____-REP_2/abundances.cxb,S_009-F_AgMi-L_live-_10-____-REP_3/abundances.cxb \
+S_002-F_AgMi-L_hear-_10-____-REP_1/abundances.cxb,S_006-F_AgMi-L_hear-_10-____-REP_2/abundances.cxb,S_010-F_AgMi-L_hear-_10-____-REP_3/abundances.cxb \
+S_003-F_AgMi-L_cere-_10-____-REP_1/abundances.cxb,S_007-F_AgMi-L_cere-_10-____-REP_2/abundances.cxb,S_011-F_AgMi-L_cere-_10-____-REP_3/abundances.cxb \
+S_004-F_AgMi-L_hipp-_10-____-REP_1/abundances.cxb,S_008-F_AgMi-L_hipp-_10-____-REP_2/abundances.cxb,S_012-F_AgMi-L_hipp-_10-____-REP_3/abundances.cxb \
+S_013-F_AgMi-L_live-_27-____-REP_1/abundances.cxb,S_017-F_AgMi-L_live-_27-____-REP_2/abundances.cxb,S_021-F_AgMi-L_live-_27-____-REP_3/abundances.cxb \
+S_014-F_AgMi-L_hear-_27-____-REP_1/abundances.cxb,S_018-F_AgMi-L_hear-_27-____-REP_2/abundances.cxb,S_022-F_AgMi-L_hear-_27-____-REP_3/abundances.cxb \
+S_015-F_AgMi-L_cere-_27-____-REP_1/abundances.cxb,S_019-F_AgMi-L_cere-_27-____-REP_2/abundances.cxb,S_023-F_AgMi-L_cere-_27-____-REP_3/abundances.cxb \
+S_016-F_AgMi-L_hipp-_27-____-REP_1/abundances.cxb,S_020-F_AgMi-L_hipp-_27-____-REP_2/abundances.cxb,S_024-F_AgMi-L_hipp-_27-____-REP_3/abundances.cxb
+
+rm ${tmp}diff_${serie}.sh" > ${tmp}diff_${serie}.sh
+
+cd ${tmp}
+chmod 755 ${tmp}diff_${serie}.sh
+rm ../slurm_logs/diff_${serie}.*.out
+sbatch -p blade,himem,hugemem --mem=512gb --cpus-per-task=20 -o ../slurm_logs/diff_${serie}.%j.out ${tmp}diff_${serie}.sh
+done
+
+#### END section
 
 exit
