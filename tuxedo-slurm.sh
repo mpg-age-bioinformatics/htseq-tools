@@ -22,7 +22,7 @@ Please make sure you have pigz and unpigz in you path.
 
 Make sure you have edited the last section of this script - cuffdiff - before you execute this script."
 
-
+module load pigz
 
 
 #############################################################################
