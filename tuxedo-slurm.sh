@@ -22,8 +22,6 @@ Please make sure you have pigz and unpigz in you path.
 
 Make sure you have edited the last section of this script - cuffdiff - before you execute this script."
 
-module load pigz
-
 
 #############################################################################
 
@@ -106,6 +104,7 @@ fi
 
 for serie in $series; do
 for file in $(ls *${serie}*.fastq.gz); do echo "#!/bin/bash
+module load pigz
 module load FastQC
 cp ${raw}${file} ${tmp}
 cd ${tmp}
@@ -142,7 +141,7 @@ for file in $(ls *${serie}*1.fastq); do
 if [[ -e ${file::(-7)}2.fastq ]]; then
 
 echo "#!/bin/bash 
-
+module load pigz
 module load Flexbar
 
 flexbar -r ${tmp}${file::(-7)}1.fastq \
@@ -158,7 +157,7 @@ rm ${tmp}flexbar_${file::(-5)}sh" > ${tmp}flexbar_${file::(-5)}sh
 else
 
 echo "#!/bin/bash
-
+module load pigz
 module load Flexbar
 
 flexbar -r ${tmp}${file::(-7)}1.fastq \
