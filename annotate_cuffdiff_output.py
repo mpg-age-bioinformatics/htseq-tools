@@ -1,4 +1,3 @@
-#!/software/Python/2.7.9/bin/python
 
 import pandas as pd
 import numpy as np
