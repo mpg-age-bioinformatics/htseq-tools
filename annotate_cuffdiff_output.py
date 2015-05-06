@@ -1,11 +1,6 @@
-
-import pandas as pd
-import numpy as np
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
-import argparse
 import os
 import sys
+import argparse
 
 sys.stdout.flush()
 
@@ -38,10 +33,17 @@ It generates 1 file for all results, 1 file for p<0.05, and 1 file/input table f
 tables containg all pair-wise comparisons in different sheets as well as gene ontology enrichment files for biological processes (BP), \
 cellular component (CC), and molecular function (MF).\n \nRequired python packages:\na) pip install --user pandas==0.15.2 \nb) pip \
 install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install --user suds==0.4 \n \nRequired R packages: \nlibrary('biomaRt')\
-. \n \nRequired arguments: \n-i, -o, -G, -C \n \nExample: \nannotate_cuffdiff_output.py -D -u John.Doe@age.mpg.de -i /path/to/cuffdiff_output_folder \
+ \n \nRequired arguments: \n-i, -o, -G, -C \n \nExample: \nannotate_cuffdiff_output.py -D -u John.Doe@age.mpg.de -i /path/to/cuffdiff_output_folder \
 -G /path/to/original.gtf -C /path/to/merged_and_compared.gtf -o /path/to/python_output_folder\
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
     sys.exit(0)
+
+
+import pandas as pd
+import numpy as np
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+
 
 if args.listMarts:
     biomaRt = importr("biomaRt")
