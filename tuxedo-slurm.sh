@@ -104,7 +104,7 @@ if [[ -e ${tmp}fastqc.ids ]]; then
 rm ${tmp}fastqc.ids
 fi
 
-for serie in $series; do 
+for serie in $series; do
 for file in $(ls *${serie}*.fastq.gz); do echo "#!/bin/bash
 module load FastQC
 cp ${raw}${file} ${tmp}
@@ -203,21 +203,19 @@ for serie in $series; do
 for file in $(ls *${serie}*1.fastq.gz); do 
 
 
-series=${file:8:4}
-
-if [[ $(contains "${SE_unstr[@]}" "$series") == "y" ]]; then
+if [[ $(contains "${SE_unstr[@]}" "$serie") == "y" ]]; then
 lib="fr-unstranded"
 files=${file}
 
-elif [[ $(contains "${SE_str[@]}" "$series") == "y" ]]; then
+elif [[ $(contains "${SE_str[@]}" "$serie") == "y" ]]; then
 lib="fr-firststrand"
 files=${file}
 
-elif [[ $(contains "${PE_str[@]}" "$series") == "y" ]]; then
+elif [[ $(contains "${PE_str[@]}" "$serie") == "y" ]]; then
 lib="fr-firststrand"
 files="${file} ${file::(-10)}2.fastq.gz"
 
-elif [[ $(contains "${mix[@]}" "$series") == "y" ]]; then
+elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
 files=${file}
 REP=${file:30:5}
 
@@ -256,6 +254,7 @@ echo -n :${id:20} >> ${tmp}th_cl.ids
 rm ${tmp}th_cl_${file::(-16)}.id
 echo "cufflinks_output/${file::(-16)}/transcripts_full_read.gtf" >> ${tmp}assemblies.txt
 
+done
 done
 
 th_cl_ids=$(cat ${tmp}th_cl.ids)
@@ -296,7 +295,7 @@ cd ../scripts
 echo "Starting cuffquant"
 
 if [[ -e ${tmp}quant.ids ]]; then
-rm ${tmp}${tmp}quant.ids
+rm ${tmp}quant.ids
 fi
 
 
@@ -372,12 +371,15 @@ S_016-F_AgMi-L_hipp-_27-____-REP_1/abundances.cxb,S_020-F_AgMi-L_hipp-_27-____-R
 
 rm ${tmp}diff_${serie}.sh" > ${tmp}diff_${serie}.sh
 
+#### END section
+
+
+
+for serie in ${series}; do
 cd ${tmp}
 chmod 755 ${tmp}diff_${serie}.sh
 rm ../slurm_logs/diff_${serie}.*.out
 sbatch -p blade,himem,hugemem --mem=512gb --cpus-per-task=20 -o ../slurm_logs/diff_${serie}.%j.out ${tmp}diff_${serie}.sh
 done
-
-#### END section
 
 exit
