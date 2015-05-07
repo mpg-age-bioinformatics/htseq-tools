@@ -383,7 +383,12 @@ for sig, label in zip(sig_choice,label_choice):
             print "Writting table "+label+"_"+outshort+".xlsx"            
             sys.stdout.flush()
             if args.DAVID:
-                writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
+		print "Starting DAVID's tables"
+                bp_sheets=[]
+		cc_sheets=[]
+		mf_sheets=[]	
+		
+		writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
                 writer_cc = pd.ExcelWriter(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
                 writer_mf = pd.ExcelWriter(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
                         
@@ -420,15 +425,21 @@ for sig, label in zip(sig_choice,label_choice):
               
         """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
         if sig == 'yes': 
-            
+            	    	            
             def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
                 if len(table_of_interest.index) >= 1:
                     enr = DAVID_get('GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT', table_of_interest, name_vs_id_table)
                     if len(enr.index) >= 1:
-                        enr[enr['Category'] == 'GOTERM_BP_FAT'].to_excel(writer_bp, sheet_name, index=False)
-                        enr[enr['Category'] == 'GOTERM_CC_FAT'].to_excel(writer_cc, sheet_name, index=False)
-                        enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, sheet_name, index=False)
-            
+                        if len(enr[enr['Category'] == 'GOTERM_BP_FAT']) > 0:
+                            enr[enr['Category'] == 'GOTERM_BP_FAT'].to_excel(writer_bp, sheet_name, index=False)
+		            bp_sheets.append(sheet_name)
+                        if len(enr[enr['Category'] == 'GOTERM_CC_FAT']) > 0:    
+			    enr[enr['Category'] == 'GOTERM_CC_FAT'].to_excel(writer_cc, sheet_name, index=False)
+			    cc_sheets.append(sheet_name)
+                        if len(enr[enr['Category'] == 'GOTERM_MF_FAT']) > 0:    
+			    enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, sheet_name, index=False)
+            		    mf_sheets.append(sheet_name)	
+				
             sample1 = df[['sample_1']]
             sample1.columns=['samples']
             sample2 = df[['sample_2']]
@@ -436,6 +447,14 @@ for sig, label in zip(sig_choice,label_choice):
             samples=pd.concat([sample1,sample2])
             samples=samples.drop_duplicates()
             samples=samples['samples'].tolist()
+
+            for sample1 in samples:
+                for sample2 in samples:
+                    if sample1 != sample2:
+                        if os.path.exists(sample1+sample2):
+                            os.rmdir(sample1+sample2)
+                        elif os.path.exists(sample2+sample1):
+                            os.rmdir(sample2+sample1)
 
             for sample1 in samples:
                 for sample2 in samples:
@@ -478,7 +497,17 @@ for sig, label in zip(sig_choice,label_choice):
             writer.save()
 	    
 	    if args.DAVID:
-	        writer_bp.save()
+	        print "Closing DAVID's tables"
+		if len(bp_sheets) == 0:
+	            df_empty=pd.DataFrame()
+		    df_empty.to_excel(writer_bp, "nothing_to_report", index=False) 
+		if len(cc_sheets) == 0:
+		    df_empty=pd.DataFrame()
+		    df_empty.to_excel(writer_cc, "nothing_to_report", index=False)			
+		if len(mf_sheets) == 0:
+		    df_empty=pd.DataFrame()
+		    df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
+		writer_bp.save()
                 writer_cc.save()
                 writer_mf.save()
                                        
