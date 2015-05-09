@@ -295,35 +295,37 @@ def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName=
         print 'Percentage mapped(background):', client.service.addList(inputBgIds,idType,bgName,listType)
 
     print 'Use categories:', client.service.setCategories(category)
-    chartReport = client.service.getChartReport(thd,ct)
-    chartRow = len(chartReport)
-    print 'Total chart records:',chartRow
+    if float(client.service.addList(inputListIds,idType,listName,listType)) > float(0):
+       
+        chartReport = client.service.getChartReport(thd,ct)
+        chartRow = len(chartReport)
+        print 'Total chart records:',chartRow
     
-    if len(resF) == 0 or not os.path.exists(resF):
-        if flagBg:
-            resF = listF + '.withBG.chartReport'
-        else:
-            resF = listF + '.chartReport'
-    with open(resF, 'w') as fOut:
-        fOut.write('Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n')
-        for row in chartReport:
-            rowDict = dict(row)
-            categoryName = str(rowDict['categoryName'])
-            termName = str(rowDict['termName'])
-            listHits = str(rowDict['listHits'])
-            percent = str(rowDict['percent'])
-            ease = str(rowDict['ease'])
-            Genes = str(rowDict['geneIds'])
-            listTotals = str(rowDict['listTotals'])
-            popHits = str(rowDict['popHits'])
-            popTotals = str(rowDict['popTotals'])
-            foldEnrichment = str(rowDict['foldEnrichment'])
-            bonferroni = str(rowDict['bonferroni'])
-            benjamini = str(rowDict['benjamini'])
-            FDR = str(rowDict['afdr'])
-            rowList = [categoryName,termName,listHits,percent,ease,Genes,listTotals,popHits,popTotals,foldEnrichment,bonferroni,benjamini,FDR]
-            fOut.write('\t'.join(rowList)+'\n')
-        print 'write file:', resF, 'finished!'
+        if len(resF) == 0 or not os.path.exists(resF):
+            if flagBg:
+                resF = listF + '.withBG.chartReport'
+            else:
+                resF = listF + '.chartReport'
+        with open(resF, 'w') as fOut:
+            fOut.write('Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n')
+            for row in chartReport:
+                rowDict = dict(row)
+                categoryName = str(rowDict['categoryName'])
+                termName = str(rowDict['termName'])
+                listHits = str(rowDict['listHits'])
+                percent = str(rowDict['percent'])
+                ease = str(rowDict['ease'])
+                Genes = str(rowDict['geneIds'])
+                listTotals = str(rowDict['listTotals'])
+                popHits = str(rowDict['popHits'])
+                popTotals = str(rowDict['popTotals'])
+                foldEnrichment = str(rowDict['foldEnrichment'])
+                bonferroni = str(rowDict['bonferroni'])
+                benjamini = str(rowDict['benjamini'])
+                FDR = str(rowDict['afdr'])
+                rowList = [categoryName,termName,listHits,percent,ease,Genes,listTotals,popHits,popTotals,foldEnrichment,bonferroni,benjamini,FDR]
+                fOut.write('\t'.join(rowList)+'\n')
+            print 'write file:', resF, 'finished!'
         
 def DAVID_get(cat, filtered_table, all_genes_table):
     IDs_table = pd.merge(filtered_table, all_genes_table, how='left', left_on='identifier', right_on='g_name')
@@ -334,31 +336,33 @@ def DAVID_get(cat, filtered_table, all_genes_table):
     background.to_csv('background_tmp.txt',sep='\t',header=False,index=False)
     
     DAVIDenrich(listF = './targets_tmp.txt', bgF = './background_tmp.txt', idType = DAVID_id, bgName = 'all_RNAseq_genes', listName = 'changed_genes', category = cat)
-    enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
-    
+    if os.path.isfile('targets_tmp.txt.withBG.chartReport'):
+        enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
+    	os.remove('targets_tmp.txt.withBG.chartReport')
+        terms=enrich['Term'].tolist()
+        enrichN=pd.DataFrame()
+        for term in terms:
+            tmp=enrich[enrich['Term']==term]
+            tmp=tmp.reset_index(drop=True)
+            ids=tmp.xs(0)['Genes']
+            ids=pd.DataFrame(data=ids.split(", "))
+            ids.columns=['g_id']
+            ids['g_id']=ids['g_id'].map(str.lower)
+            all_genes_table['g_id']=all_genes_table['g_id'].map(str.lower)
+            ids=pd.merge(ids, all_genes_table, how='left', left_on='g_id', right_on='g_id')
+            names=ids['g_name'].tolist()
+            names = ', '.join(names)
+            tmp=tmp.replace(to_replace=tmp.xs(0)['Genes'], value=names)
+            enrichN=pd.concat([enrichN, tmp])
+        enrichN=enrichN.reset_index(drop=True)
+
+    else:
+	enrichN=pd.DataFrame()
+ 
     os.remove('targets_tmp.txt')
     os.remove('background_tmp.txt')  
-    os.remove('targets_tmp.txt.withBG.chartReport')
-    
-    terms=enrich['Term'].tolist()
-    enrichN=pd.DataFrame()
-    for term in terms:
-        tmp=enrich[enrich['Term']==term]
-        tmp=tmp.reset_index(drop=True)
-        ids=tmp.xs(0)['Genes']
-        ids=pd.DataFrame(data=ids.split(", "))
-        ids.columns=['g_id']
-        ids['g_id']=ids['g_id'].map(str.lower)
-        all_genes_table['g_id']=all_genes_table['g_id'].map(str.lower)
-        ids=pd.merge(ids, all_genes_table, how='left', left_on='g_id', right_on='g_id')
-        names=ids['g_name'].tolist()
-        names = ', '.join(names)
-        tmp=tmp.replace(to_replace=tmp.xs(0)['Genes'], value=names)
-        enrichN=pd.concat([enrichN, tmp])
-    enrichN=enrichN.reset_index(drop=True)    
     
     return enrichN
-
 
 
 # create excel report tables
@@ -497,19 +501,31 @@ for sig, label in zip(sig_choice,label_choice):
             writer.save()
 	    
 	    if args.DAVID:
+
 	        print "Closing DAVID's tables"
 		if len(bp_sheets) == 0:
 	            df_empty=pd.DataFrame()
-		    df_empty.to_excel(writer_bp, "nothing_to_report", index=False) 
+		    df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
+		    writer_bp.save()
+                    os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
+		else:
+		    writer_bp.save()
+ 
 		if len(cc_sheets) == 0:
 		    df_empty=pd.DataFrame()
-		    df_empty.to_excel(writer_cc, "nothing_to_report", index=False)			
+		    df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
+		    writer_cc.save()
+  		    os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
+		else:
+		    writer_cc.save() 
+
 		if len(mf_sheets) == 0:
 		    df_empty=pd.DataFrame()
 		    df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
-		writer_bp.save()
-                writer_cc.save()
-                writer_mf.save()
+		    writer_mf.save()
+	            os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
+		else:
+		    writer_mf.save()
                                        
     if sig != 'yes':
         df.to_excel(writer, outshort+'_'+'ALL', index=False)
