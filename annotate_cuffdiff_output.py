@@ -142,16 +142,19 @@ original_gtf = args.originalGTF
 merged_fixed_gtf = args.cuffcompareGTF
 python_output = args.outputFolder
 
-os.chdir(diff_out)
-
 if not os.path.exists(python_output):
     os.makedirs(python_output)
+
+os.chdir(diff_out)
 
 ########## Get list of gene names and respective ids present in the data set
 
 if os.path.isfile(python_output+'/genes_table.txt'):
     print "\nUsing already existing list of gene names and ids"
     sys.stdout.flush()
+    genes=pd.read_table(python_output+'/genes_table.txt')
+    genes = genes['g_id'].tolist()
+
 else:
     print "\nGetting list of gene names and respective ids present in the data set"
     sys.stdout.flush()
