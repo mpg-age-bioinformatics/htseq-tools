@@ -72,14 +72,23 @@ if args.listAttributes:
     print(biomaRt.listAttributes(ensembl))
     sys.exit(0)
 
-                    
-print "\nInput folder: "+args.inputFolder
+################### paths to files #########################
+diff_out = os.path.realpath(args.inputFolder)
+original_gtf = os.path.realpath(args.originalGTF)
+merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
+python_output = args.outputFolder
+
+if not os.path.exists(python_output):
+    os.makedirs(python_output)
+python_output=os.path.realpath(python_output)
+
+print "\nInput folder: "+diff_out
 sys.stdout.flush()
-print "Output folder: "+args.outputFolder
+print "Output folder: "+python_output
 sys.stdout.flush()
-print "Original GTF: "+args.originalGTF
+print "Original GTF: "+original_gtf
 sys.stdout.flush()
-print "Cuffcompare curated GTF: "+args.cuffcompareGTF
+print "Cuffcompare curated GTF: "+merged_fixed_gtf
 sys.stdout.flush()
 print "Files being analysed: "+args.inputFiles
 sys.stdout.flush()
@@ -93,8 +102,6 @@ if args.sigOnly:
 else:
     sig_choice = [0.05, 2, 'yes']
     label_choice = ['diff_p.05','diff_all','diff_sig']
-
-
 
 if args.DAVID:
     print "\nPerforming DAVID GO enrichment analysis"
@@ -137,15 +144,6 @@ data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
 # http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
 DAVID_id=args.DAVIDid
 ####################################################################
-
-################### paths to files #########################
-diff_out = args.inputFolder
-original_gtf = args.originalGTF
-merged_fixed_gtf = args.cuffcompareGTF
-python_output = args.outputFolder
-
-if not os.path.exists(python_output):
-    os.makedirs(python_output)
 
 os.chdir(diff_out)
 
