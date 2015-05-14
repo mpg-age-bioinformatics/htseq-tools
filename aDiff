@@ -532,7 +532,7 @@ for sig, label in zip(sig_choice,label_choice):
                                        
     if sig != 'yes':
         df.to_excel(writer, outshort+'_'+'ALL', index=False)
-
+	writer.save()
                                        
 print "\nDone"
 print "\n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
