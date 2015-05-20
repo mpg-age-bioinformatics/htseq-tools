@@ -34,7 +34,7 @@ if args.description:
 It generates 1 file for all results, 1 file for p<0.05, and 1 file/input table for q<0.05. \nFor significant values (i.e. q<0.05) it also generates \
 tables containg all pair-wise comparisons in different sheets as well as gene ontology enrichment files for biological processes (BP), \
 cellular component (CC), and molecular function (MF).\n \nRequired python packages:\na) pip install --user pandas==0.15.2 \nb) pip \
-install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install --user suds==0.4 \n \nRequired R packages: \nlibrary('biomaRt')\
+install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install --user suds==0.4 \ne) pip install --user openpyxl==2.1.4 \n \nRequired R packages: \nlibrary('biomaRt')\
  \n \nRequired arguments: \n-i, -o, -G, -C \n \nExample: \nannotate_cuffdiff_output.py -D -u John.Doe@age.mpg.de -i /path/to/cuffdiff_output_folder \
 -G /path/to/original.gtf -C /path/to/merged_and_compared.gtf -o /path/to/python_output_folder\
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
