@@ -225,6 +225,7 @@ fi
 
 echo "#!/bin/bash
 cd ${rawt}
+module load Bowtie2
 module load TopHat
 tophat -p 20 --library-type ${lib} \
 --transcriptome-index ${GTF_index} \
