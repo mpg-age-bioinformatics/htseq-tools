@@ -18,8 +18,6 @@ S_XXX-F_XXXX-L_XXXXX-XXX-XXXX-REP_X-READ_x.fastq.gz
 Please notice that for paired samples, the S_XXX is the same.
 
 
-Please make sure you have pigz and unpigz in you path.
-
 Make sure you have edited the last section of this script - cuffdiff - before you execute this script."
 
 
@@ -162,7 +160,7 @@ module load Flexbar
 
 flexbar -r ${tmp}${file::(-7)}1.fastq \
 -t ${top}raw_trimmed/${file::(-6)} \
--n 20 -a ${top}others/TruSeqAdapters.txt \
+-n 20 -a -a ${adapters_file} \
 -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
 cd ${top}raw_trimmed
 pigz -p 10 ${file}
