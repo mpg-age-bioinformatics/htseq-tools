@@ -122,7 +122,7 @@ toplevel=${toplevel%".fa"}
 mkdir bowtie2
 cd bowtie2
 ln -s ../${original} ${original}
-
+module load Bowtie2
 bowtie2-build-s $original $toplevel
 
 cd ..
@@ -130,6 +130,7 @@ gtf=$(ls *.gtf)
 
 # Fix GTF with cuffcompare
 
+module load Cufflinks
 cuffcompare -V -CG -s chromosomes -r $gtf $gtf
 
 mv cuffcmp.combined.gtf cuffcmp_GTF.$gtf
@@ -142,6 +143,7 @@ printf "
 Indexing cuffcompare GTF
 "
 
+module load TopHat
 mkdir cuffcmp_GTF_index
 tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index bowtie2/$toplevel
 rm -r tophat_out
@@ -162,6 +164,7 @@ printf "
 Generating BWA index
 "
 
+module load BWA
 mkdir bwa
 cd bwa
 full_path=$(pwd)
@@ -178,6 +181,7 @@ printf "
 Generating STAR index
 "
 
+module load STAR
 mkdir star
 cd star
 full_path=$(pwd)
