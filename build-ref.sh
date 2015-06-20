@@ -106,12 +106,15 @@ mv $file $nname; done
 
 mkdir chromosomes
 for file in $(ls *chromosome*); do
+if [ ${file} != chromosomes: ]; then
 chrp1=$(echo $file | cut -f4 -d.)
 chrp2=$(echo $file | cut -f5 -d.)
 sep=.
 chr=$chrp1$sep$chrp2
 
-mv ${file} chromosomes/${chr}; done
+mv ${file} chromosomes/${chr}; fi; done
+
+mv *nonchromosomal* chromosomes/nonchromosomal.fa
 
 original=$(ls *dna.toplevel.fa)
 toplevel=${original#".fa"}
@@ -123,7 +126,8 @@ mkdir bowtie2
 cd bowtie2
 ln -s ../${original} ${original}
 module load Bowtie2
-bowtie2-build-s $original $toplevel
+bowtie2-build-s $original $toplevel 2>&1 | tee bowtie.log
+which bowtie2 >> bowtie.log
 
 cd ..
 gtf=$(ls *.gtf)
@@ -131,7 +135,8 @@ gtf=$(ls *.gtf)
 # Fix GTF with cuffcompare
 
 module load Cufflinks
-cuffcompare -V -CG -s chromosomes -r $gtf $gtf
+cuffcompare -V -CG -s chromosomes -r $gtf $gtf 2>&1 | tee cuffcompare.log
+which cuffcompare >> cuffcompare.log
 
 mv cuffcmp.combined.gtf cuffcmp_GTF.$gtf
 tar -jcvf cuffcmp.results.tar.bz2 cuffcmp.* --remove-files
@@ -145,7 +150,9 @@ Indexing cuffcompare GTF
 
 module load TopHat
 mkdir cuffcmp_GTF_index
-tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index bowtie2/$toplevel
+tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
+which tophat2 >> index.log
+mv index.log cuffcmp_GTF_index/index.log
 rm -r tophat_out
 
 
@@ -154,7 +161,9 @@ Indexing GTF
 "
 
 mkdir GTF_index
-tophat2 -G $gtf --transcriptome-index GTF_index bowtie2/$toplevel
+tophat2 -G $gtf --transcriptome-index GTF_index bowtie2/$toplevel 2>&1 | tee index.log
+which tophat2 >> index.log
+mv index.log GTF_index/index.log
 rm -r tophat_out
 
 
@@ -170,7 +179,8 @@ cd bwa
 full_path=$(pwd)
 ln -s ../${original} ${original}  
 echo "#!/bin/bash
-bwa index -a bwtsw -p ${full_path}/${original::(-3)} ${original}" > bwa.sh
+bwa index -a bwtsw -p ${full_path}/${original::(-3)} ${original}
+which bwa" > bwa.sh
 chmod 770 bwa.sh; sbatch -p himem,hugemem,blade -o bwa.log bwa.sh
 cd ..
 
@@ -189,6 +199,7 @@ ln -s ../${original} ${original}
 ln -s ../${gtf} ${gtf}
 echo "#!/bin/bash
 STAR --runMode genomeGenerate --genomeDir ${full_path} --genomeFastaFiles ${original} --runThreadN 20 --sjdbGTFfile ${gtf} --sjdbOverhang 100 --limitGenomeGenerateRAM 240000000000
+which STAR
 " > star.sh; chmod 770 star.sh; sbatch --cpus-per-task=20 -p himem,hugemem,blade --mem=256GB -o star.log star.sh
 cd ..
 
