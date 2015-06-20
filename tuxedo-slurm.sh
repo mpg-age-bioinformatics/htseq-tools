@@ -42,7 +42,7 @@ series="AgMi"
 # Reference genome
 
 ann=/data/genomes/mus_musculus/GRCm38_79
-ori_GTF=$(readlink -f  ${ann}/*.gtf)
+ori_GTF=$(readlink -f  ${ann}/GRCm38.*.gtf)
 GTF_file=$(readlink -f ${ann}/cuffcmp_GTF.*.gtf)
 GTF_index=$(readlink -f ${ann}/cuffcmp_GTF_index/*.gff)
 GTF_index=${GTF_index::(-4)}
