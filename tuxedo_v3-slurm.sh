@@ -44,11 +44,10 @@ series="HaIS"
 ann=/data/genomes/caenorhabditis_elegans/WBcel235_79
 ori_GTF=$(readlink -f  ${ann}/WBcel235.*.gtf)
 hisat_index=${ann}/hisat/WBcel235.dna.toplevel
-adapters_file=full_path_to_adapters_file_for_flexbar_to_use
+adapters_file=/beegfs/group_bit/home/JBoucas/documents/TruSeqAdapters.txt
 genome=${ann}/hisat/WBcel235.dna.toplevel.fa
 
 #############################################################################
-
 
 
 echo "Creating required folders"
@@ -71,6 +70,7 @@ merg=$(readlink -f ../cuffmerge_output)/
 qua=$(readlink -f ../cuffquant_output)/ 
 
 
+echo "Start time:  $(date)" >> ../tmp/time.log
 
 # Required function
 
@@ -90,8 +90,6 @@ function contains() {
 #############################################################################
 
 
-
-
 echo "Starting FASTQC"
 
 cd ${raw} 
@@ -106,14 +104,14 @@ module load pigz
 module load FastQC
 cp ${raw}${file} ${tmp}
 cd ${tmp}
-unpigz -p 10 ${file}
-fastqc -t 10 -o ../fastqc ${file::(-3)}
+unpigz -p 4 ${file}
+fastqc -t 4 -o ../fastqc ${file::(-3)}
 rm ${tmp}fastqc_${file::(-9)}.sh" > ${tmp}fastqc_${file::(-9)}.sh
 
 cd ${tmp} 
 chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
 rm ../slurm_logs/fastqc_${file::(-9)}.*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=10 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh 2>&1 | tee ${tmp}fastqc_${file::(-2)}id
+sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh 2>&1 | tee ${tmp}fastqc_${file::(-2)}id
 
 id=$(cat ${tmp}fastqc_${file::(-2)}id | grep 'Submitted batch job')
 
@@ -124,6 +122,61 @@ done
 
 fastqc_ids=$(cat ${tmp}fastqc.ids)
 srun -p blade,himem,hugemem -d afterok${fastqc_ids} echo "FASTQC done"
+
+#############################################################################
+
+cd ${tmp}
+
+if [[ -e ${tmp}flexbar.ids ]]; then
+rm ${tmp}flexbar.ids
+fi
+
+
+for serie in $series; do
+for file in $(ls *${serie}*1.fastq); do
+
+if [[ -e ${file::(-7)}2.fastq ]]; then
+
+echo "#!/bin/bash 
+module load pigz
+module load Flexbar
+flexbar -r ${tmp}${file::(-7)}1.fastq \
+-p ${tmp}${file::(-7)}2.fastq -t ${top}raw_trimmed/${file::(-8)} \
+-n 18 -a ${adapters_file} \
+-ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+cd ${top}raw_trimmed
+pigz -p 18 ${file::(-7)}1.fastq
+pigz -p 18 ${file::(-7)}2.fastq
+rm ${tmp}flexbar_${file::(-5)}sh" > ${tmp}flexbar_${file::(-5)}sh
+
+else
+
+echo "#!/bin/bash
+module load pigz
+module load Flexbar
+flexbar -r ${tmp}${file::(-7)}1.fastq \
+-t ${top}raw_trimmed/${file::(-6)} \
+-n 18 -a -a ${adapters_file} \
+-ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+cd ${top}raw_trimmed
+pigz -p 18 ${file}
+rm ${tmp}flexbar_${file::(-5)}sh" > ${tmp}flexbar_${file::(-5)}sh
+
+fi
+
+cd ${tmp}
+chmod 755 ${tmp}flexbar_${file::(-5)}sh
+rm ../slurm_logs/flexbar_${file::(-5)}*.out
+sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-5)}%j.out ${tmp}flexbar_${file::(-5)}sh 2>&1 | tee ${tmp}flexbar_${file::(-5)}id
+id=$(cat ${tmp}flexbar_${file::(-5)}id | grep 'Submitted batch job')
+echo -n :${id:20} >> ${tmp}flexbar.ids
+rm ${tmp}flexbar_${file::(-5)}id
+done
+done
+
+flexbar_ids=$(cat ${tmp}flexbar.ids)
+srun -p blade,himem,hugemem -d afterok${flexbar_ids} echo "FLEXBAR done"
+
 
 #############################################################################
 
@@ -167,7 +220,7 @@ echo "#!/bin/bash
 cd ${rawt}
 module load Bowtie2
 module load HISAT
-hisat -p 20 ${lib} --met-file ${top}hisat_output/${file::(-16)}.stats \
+hisat -p 18 ${lib} --met-file ${top}hisat_output/${file::(-16)}.stats \
 -x ${hisat_index} -S ${top}hisat_output/${file::(-16)}.sam \
 ${files}
 
@@ -175,25 +228,21 @@ cd ${top}hisat_output
 module load SAMtools
 
 printf 'Filtering mapped reads and sorting bam file'
-
-samtools view -@ 20 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 20 - ${file::(-16)}
-
+samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 - ${file::(-16)}
 mkdir ${top}stringtie_output/${file::(-16)}
 
 printf 'Starting StringTie'
-
 module load StringTie
 stringtie ${file::(-16)}.bam -o ${top}stringtie_output/${file::(-16)}.gtf \
--p 20 -G ${ori_GTF} \
+-p 18 -G ${ori_GTF} \
 -C ${top}stringtie_output/${file::(-16)}_full_cov.gtf \
 -b ${top}stringtie_output/${file::(-16)} 
-
 rm ${tmp}HS_ST_${file::(-16)}.sh" > ${tmp}HS_ST_${file::(-16)}.sh
 
 cd ${tmp}
 chmod 755 ${tmp}HS_ST_${file::(-16)}.sh 
 rm ../slurm_logs/HS_ST_${file::(-16)}.*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=20 -o ../slurm_logs/HS_ST_${file::(-16)}.%j.out ${tmp}HS_ST_${file::(-16)}.sh 2>&1 | tee ${tmp}HS_ST_${file::(-16)}.id
+sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/HS_ST_${file::(-16)}.%j.out ${tmp}HS_ST_${file::(-16)}.sh 2>&1 | tee ${tmp}HS_ST_${file::(-16)}.id
 id=$(cat ${tmp}HS_ST_${file::(-16)}.id | grep 'Submitted batch job')
 echo -n :${id:20} >> ${tmp}HS_ST.ids
 rm ${tmp}HS_ST_${file::(-16)}.id
@@ -226,13 +275,6 @@ cd ${top}
 module load Cufflinks
 srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 --min-isoform-fraction 1.0 -o ${cmout} \
 -g ${ori_GTF} -s ${genome} ${tmp}assemblies_${serie}.txt
-
-cd ${cmout}
-mkdir cuffcompare_output
-cd cuffcompare_output
-echo "STARTING CUFFCOMPARE"
-module load Cufflinks
-#srun -p himem,hugemem,blade --cpus-per-task=2 cuffcompare -C -r ${ori_GTF} -s ${ann}/chromosomes ${cmout}merged.gtf
 done
 
 cd ${tmp}
@@ -264,11 +306,12 @@ fi
 cd ${top}hisat_output
 
 for file in $(ls *${serie}*.bam); do echo "#!/bin/bash
+
 cd ${top}cuffquant_output
 mkdir ${serie}
 cd ${serie}
 module load Cufflinks
-cuffquant -p 20 --library-type ${lib} \
+cuffquant -p 18 --library-type ${lib} \
 -o ${file::(-4)} \
 ${top}cuffmerge_output/${serie}/merged.gtf \
 ${top}hisat_output/${file}
@@ -277,7 +320,7 @@ rm ${tmp}quant_${file::(-4)}.sh" > ${tmp}quant_${file::(-4)}.sh
 cd ${tmp}
 chmod 755 ${tmp}quant_${file::(-4)}.sh
 rm ../slurm_logs/quant_${file::(-4)}.*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=20 -o ../slurm_logs/quant_${file::(-4)}.%j.out ${tmp}quant_${file::(-4)}.sh 2>&1 | tee ${tmp}quant_${file::(-4)}.id
+sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/quant_${file::(-4)}.%j.out ${tmp}quant_${file::(-4)}.sh 2>&1 | tee ${tmp}quant_${file::(-4)}.id
 id=$(cat ${tmp}quant_${file::(-4)}.id | grep 'Submitted batch job')
 echo -n :${id:20} >> ${tmp}quant.ids
 rm ${tmp}quant_${file::(-4)}.id
@@ -302,13 +345,13 @@ echo "#!/bin/bash
 cd ${qua}${serie}
 
 module load Cufflinks
-
-cuffdiff -p 20 --library-type ${lib} \
+cuffdiff -p 18 --library-type ${lib} \
 -L N2,daf2 \
 -o ${dout} --dispersion-method per-condition \
 ${top}cuffmerge_output/${series}/merged.gtf \
 S_160-F_HaIS-L____N2-___-____-REP_1/abundances.cxb,S_161-F_HaIS-L____N2-___-____-REP_2/abundances.cxb,S_162-F_HaIS-L____N2-___-____-REP_3/abundances.cxb \
 S_163-F_HaIS-L__daf2-___-____-REP_1/abundances.cxb,S_164-F_HaIS-L__daf2-___-____-REP_2/abundances.cxb,S_165-F_HaIS-L__daf2-___-____-REP_3/abundances.cxb
+
 
 rm ${tmp}diff_${serie}.sh" > ${tmp}diff_${serie}.sh
 
@@ -318,7 +361,7 @@ for serie in ${series}; do
 cd ${tmp}
 chmod 755 ${tmp}diff_${serie}.sh
 rm ../slurm_logs/diff_${serie}.*.out
-sbatch -p blade,himem,hugemem --mem=512gb --cpus-per-task=20 -o ../slurm_logs/diff_${serie}.%j.out ${tmp}diff_${serie}.sh
+sbatch -p blade,himem,hugemem --mem=512gb --cpus-per-task=18 -o ../slurm_logs/diff_${serie}.%j.out ${tmp}diff_${serie}.sh
 done
 
 exit
