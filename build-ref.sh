@@ -23,6 +23,7 @@
 # -s $references_directory/caenorhabditis_elegans/WBcell235_78/chromosomes  
 
 script=$(readlink -f $0)
+cd ${1} 
 
 curl -l ftp://ftp.ensembl.org/pub/current_fasta/
 
