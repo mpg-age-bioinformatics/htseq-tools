@@ -225,6 +225,7 @@ cp hisat.log ../logs/
 " > hisat.sh; chmod 770 hisat.sh; sbatch -p himem,hugemem,blade -o hisat.log --cpus-per-task=4 hisat.sh
 cd ..
 
+cp ${script} logs/script.log
 
 else
 
