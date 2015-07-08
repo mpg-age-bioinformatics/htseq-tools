@@ -543,8 +543,10 @@ for sig, label in zip(sig_choice,label_choice):
                     else:
                         writer_mf.save()
                                        
+    	if sig != 'yes':
+	    df.to_excel(writer, outshort+'_'+'ALL', index=False)
+	
     if sig != 'yes':
-        df.to_excel(writer, outshort+'_'+'ALL', index=False)
 	writer.save()
                                        
 print "\nDone"
