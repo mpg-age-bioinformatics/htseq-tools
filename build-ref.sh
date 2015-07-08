@@ -22,6 +22,8 @@
 # example cuffcompare options:
 # -s $references_directory/caenorhabditis_elegans/WBcell235_78/chromosomes  
 
+script=$(readlink -f $0)
+
 curl -l ftp://ftp.ensembl.org/pub/current_fasta/
 
 printf "Paste your organism from the list above: "
@@ -120,6 +122,7 @@ original=$(ls *dna.toplevel.fa)
 toplevel=${original#".fa"}
 toplevel=${toplevel%".fa"}
 
+mkdir logs
 
 # BOWTIE2 index
 mkdir bowtie2
@@ -128,6 +131,7 @@ ln -s ../${original} ${original}
 module load Bowtie2
 bowtie2-build-s $original $toplevel 2>&1 | tee bowtie.log
 which bowtie2 >> bowtie.log
+mv bowtie.log ../logs
 
 cd ..
 gtf=$(ls *.gtf)
@@ -137,6 +141,7 @@ gtf=$(ls *.gtf)
 module load Cufflinks
 cuffcompare -V -CG -s chromosomes -r $gtf $gtf 2>&1 | tee cuffcompare.log
 which cuffcompare >> cuffcompare.log
+mv cuffcompare.log logs/
 
 mv cuffcmp.combined.gtf cuffcmp_GTF.$gtf
 tar -jcvf cuffcmp.results.tar.bz2 cuffcmp.* --remove-files
@@ -152,7 +157,7 @@ module load TopHat
 mkdir cuffcmp_GTF_index
 tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
 which tophat2 >> index.log
-mv index.log cuffcmp_GTF_index/index.log
+mv index.log logs/cuffcmp_GTF.index.log
 rm -r tophat_out
 
 
@@ -163,7 +168,7 @@ Indexing GTF
 mkdir GTF_index
 tophat2 -G $gtf --transcriptome-index GTF_index bowtie2/$toplevel 2>&1 | tee index.log
 which tophat2 >> index.log
-mv index.log GTF_index/index.log
+mv index.log logs/GTF.index.log
 rm -r tophat_out
 
 
@@ -180,7 +185,9 @@ full_path=$(pwd)
 ln -s ../${original} ${original}  
 echo "#!/bin/bash
 bwa index -a bwtsw -p ${full_path}/${original::(-3)} ${original}
-which bwa" > bwa.sh
+which bwa
+cp bwa.log ../logs
+" > bwa.sh
 chmod 770 bwa.sh; sbatch -p himem,hugemem,blade -o bwa.log bwa.sh
 cd ..
 
@@ -200,8 +207,24 @@ ln -s ../${gtf} ${gtf}
 echo "#!/bin/bash
 STAR --runMode genomeGenerate --genomeDir ${full_path} --genomeFastaFiles ${original} --runThreadN 20 --sjdbGTFfile ${gtf} --sjdbOverhang 100 --limitGenomeGenerateRAM 240000000000
 which STAR
+cp star.log ../logs
 " > star.sh; chmod 770 star.sh; sbatch --cpus-per-task=20 -p himem,hugemem,blade --mem=256GB -o star.log star.sh
 cd ..
+
+
+# HiSat index creation
+
+mkdir hisat
+cd hisat
+full_path=$(pwd)
+ln -s ../${original} ${original}
+echo "#!/bin/bash
+module load HISAT
+hisat-build ${original} ${original}
+cp hisat.log ../logs/
+" > hisat.sh; chmod 770 hisat.sh; sbatch -p himem,hugemem,blade -o hisat.log --cpus-per-task=4 hisat.sh
+cd ..
+
 
 else
 
