@@ -155,9 +155,9 @@ Indexing cuffcompare GTF
 
 module load TopHat
 mkdir cuffcmp_GTF_index
-tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index cuffcmp_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
+tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index tophat_cuffcmp_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
 which tophat2 >> index.log
-mv index.log logs/cuffcmp_GTF.index.log
+mv index.log logs/tophat.cuffcmp_GTF.index.log
 rm -r tophat_out
 
 
@@ -166,9 +166,9 @@ Indexing GTF
 "
 
 mkdir GTF_index
-tophat2 -G $gtf --transcriptome-index GTF_index bowtie2/$toplevel 2>&1 | tee index.log
+tophat2 -G $gtf --transcriptome-index tophat_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
 which tophat2 >> index.log
-mv index.log logs/GTF.index.log
+mv index.log logs/tophat.GTF.index.log
 rm -r tophat_out
 
 
