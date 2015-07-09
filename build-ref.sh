@@ -23,14 +23,19 @@
 # -s $references_directory/caenorhabditis_elegans/WBcell235_78/chromosomes  
 
 script=$(readlink -f $0)
-cd ${1} 
+
+if [[ ! -d ${1} ]]; then mkdir -p ${1}; fi
+dest=$(readlink -f ${1}) 
+cd ${dest} 
 
 curl -l ftp://ftp.ensembl.org/pub/current_fasta/
+# atlernative: ncftpls -l ftp://ftp.ensembl.org/pub/current_fasta/
 
-printf "Paste your organism from the list above: "
+
+printf "Paste your organism from the list above (eg. saccharomyces_cerevisiae): "
 read organism
 
-if [ ! -d "organism" ]; then mkdir $organism; fi
+if [ ! -d "${organism}" ]; then mkdir $organism; fi
 
 cd $organism
 
@@ -131,6 +136,7 @@ cd bowtie2
 ln -s ../${original} ${original}
 module load Bowtie2
 bowtie2-build-s $original $toplevel 2>&1 | tee bowtie.log
+echo "$(date)" >> bowtie.log
 which bowtie2 >> bowtie.log
 mv bowtie.log ../logs
 
@@ -141,6 +147,7 @@ gtf=$(ls *.gtf)
 
 module load Cufflinks
 cuffcompare -V -CG -s chromosomes -r $gtf $gtf 2>&1 | tee cuffcompare.log
+echo "$(date)" >> cuffcompare.log
 which cuffcompare >> cuffcompare.log
 mv cuffcompare.log logs/
 
@@ -155,8 +162,9 @@ Indexing cuffcompare GTF
 "
 
 module load TopHat
-mkdir cuffcmp_GTF_index
+mkdir tophat_cuffcmp_GTF_index
 tophat2 -G cuffcmp_GTF.$gtf --transcriptome-index tophat_cuffcmp_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
+echo "$(date)" >> index.log
 which tophat2 >> index.log
 mv index.log logs/tophat.cuffcmp_GTF.index.log
 rm -r tophat_out
@@ -166,8 +174,9 @@ printf "
 Indexing GTF
 "
 
-mkdir GTF_index
+mkdir tophat_GTF_index
 tophat2 -G $gtf --transcriptome-index tophat_GTF_index bowtie2/$toplevel 2>&1 | tee index.log
+echo "$(date)" >> index.log
 which tophat2 >> index.log
 mv index.log logs/tophat.GTF.index.log
 rm -r tophat_out
@@ -186,6 +195,7 @@ full_path=$(pwd)
 ln -s ../${original} ${original}  
 echo "#!/bin/bash
 bwa index -a bwtsw -p ${full_path}/${original::(-3)} ${original}
+echo '$(date)'
 which bwa
 cp bwa.log ../logs
 " > bwa.sh
@@ -202,18 +212,30 @@ Generating STAR index
 module load STAR
 mkdir star
 cd star
+
+wSTAR=$(which STARshort)
+IFS='/' read -ra VER <<< "$wSTAR"
+VER=${VER[3]}
+mkdir ${VER}
+cd ${VER}
+
 full_path=$(pwd)
-ln -s ../${original} ${original}
-ln -s ../${gtf} ${gtf}
+ln -s ../../${original} ${original}
+ln -s ../../${gtf} ${gtf}
 echo "#!/bin/bash
-STAR --runMode genomeGenerate --genomeDir ${full_path} --genomeFastaFiles ${original} --runThreadN 20 --sjdbGTFfile ${gtf} --sjdbOverhang 100 --limitGenomeGenerateRAM 240000000000
-which STAR
-cp star.log ../logs
-" > star.sh; chmod 770 star.sh; sbatch --cpus-per-task=20 -p himem,hugemem,blade --mem=256GB -o star.log star.sh
-cd ..
+STARshort --runMode genomeGenerate --genomeDir ${full_path} --genomeFastaFiles ${original} --runThreadN 18 --sjdbGTFfile ${gtf} --sjdbOverhang 100 --limitGenomeGenerateRAM 90543555797
+echo '$(date)'
+which STARshort
+cp star.log ../../logs/
+" > star.sh; chmod 770 star.sh; sbatch --cpus-per-task=18 -p himem,hugemem,blade --mem=100GB -o star.log star.sh
+cd ../../
 
 
 # HiSat index creation
+
+printf "
+Generating HiSat index
+"
 
 mkdir hisat
 cd hisat
@@ -222,6 +244,8 @@ ln -s ../${original} ${original}
 echo "#!/bin/bash
 module load HISAT
 hisat-build ${original} ${original}
+echo '$(date)'
+which hisat
 cp hisat.log ../logs/
 " > hisat.sh; chmod 770 hisat.sh; sbatch -p himem,hugemem,blade -o hisat.log --cpus-per-task=4 hisat.sh
 cd ..
