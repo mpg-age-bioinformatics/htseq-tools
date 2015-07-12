@@ -3,32 +3,31 @@
 This repository hosts scripts and tools for RNAseq analysis
 
 # tuxedo-slurm.sh #
-this script runs an full RNAseq pipeline under a slurm jobs distribution system
-\nfastQC - quality control
-\nflexbar - adapters and quality trimming
-\ntophat - aligner
-\ncufflinks - transcripts assembly and quantification
-\ncuffmerge - merging of assemblies
-\ncuffcompare - corrrection of lost protein ids
-\ncuffquant - transcript expression profiles
-\ncuffdiff - differential expression analysis
+this script runs an full RNAseq pipeline under a slurm jobs distribution system <br />
+fastQC - quality control <br />
+flexbar - adapters and quality trimming <br />
+tophat - aligner <br />
+cufflinks - transcripts assembly and quantification <br />
+cuffmerge - merging of assemblies <br />
+cuffcompare - corrrection of lost protein ids <br />
+cuffquant - transcript expression profiles <br />
+cuffdiff - differential expression analysis <br />
 
 # tuxedo-slurm.sh #
-this script runs an full RNAseq pipeline under a slurm jobs distribution system \
-using about 18 processes per file allowing full analysis of 20 libraries with \
-50 - 150 M reads per libary to complete under 12h
-fastQC - quality control
-flexbar - adapters and quality trimming
-hisat - aligner
-stringtie - transcripts assembly and quantification
-cuffmerge - merging of assemblies
-cuffquant - transcript expression profiles
-cuffdiff - differential expression analysis
+this script runs an full RNAseq pipeline under a slurm jobs distribution system <br />
+using about 18 processes per file allowing full analysis of 20 libraries with <br />
+50 - 150 M reads per libary to complete under 12h <br />
+fastQC - quality control <br />
+flexbar - adapters and quality trimming <br />
+hisat - aligner <br />
+stringtie - transcripts assembly and quantification <br />
+cuffmerge - merging of assemblies <br />
+cuffquant - transcript expression profiles <br />
+cuffdiff - differential expression analysis <br />
 
 # aDiff #
-this python script takes cuffdiff results as inputs and generates excel report \
-tables for each parallel comparison. It annotates each gene with the respective \
-GO term. It also uses DAVID to perform GO enrichment analysis of biological process, \
-cellular components,  and molecular function using significantly changed genes, \
-transcripts, promoter usage, splicing, CDS  - biological process, cellular \
-component, molecular function.
+this python script takes cuffdiff results as inputs and generates excel report <br />
+tables for each parallel comparison. It annotates each gene with the respective <br />
+GO term. It also uses DAVID to perform GO enrichment analysis of biological process, <br />
+cellular components,  and molecular function using significantly changed genes, <br />
+transcripts, promoter usage, splicing, CDS.
