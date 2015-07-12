@@ -3,7 +3,7 @@
 This repository hosts scripts and tools for RNAseq analysis
 
 #### tuxedo-slurm.sh
-this script runs an full RNAseq pipeline under a slurm jobs distribution system <br />
+this script runs a full RNAseq pipeline under a slurm jobs distribution system <br />
 fastQC - quality control <br />
 flexbar - adapters and quality trimming <br />
 tophat - aligner <br />
@@ -14,7 +14,7 @@ cuffquant - transcript expression profiles <br />
 cuffdiff - differential expression analysis <br />
 
 #### tuxedo_V3-slurm.sh 
-this script runs an full RNAseq pipeline under a slurm jobs distribution system <br />
+this script runs a full RNAseq pipeline under a slurm jobs distribution system <br />
 using about 18 processes per file allowing full analysis of 20 libraries with <br />
 50 - 150 M reads per libary to complete under 12h <br />
 fastQC - quality control <br />
