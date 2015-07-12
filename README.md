@@ -13,7 +13,7 @@ cuffcompare - corrrection of lost protein ids <br />
 cuffquant - transcript expression profiles <br />
 cuffdiff - differential expression analysis <br />
 
-#### tuxedo_V3-slurm.sh 
+#### tuxedo_v3-slurm.sh 
 this script runs a full RNAseq pipeline under a slurm jobs distribution system <br />
 using about 18 processes per file allowing full analysis of 20 libraries with <br />
 50 - 150 M reads per libary to complete under 12h <br />
