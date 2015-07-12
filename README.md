@@ -4,14 +4,14 @@ This repository hosts scripts and tools for RNAseq analysis
 
 # tuxedo-slurm.sh #
 this script runs an full RNAseq pipeline under a slurm jobs distribution system
-fastQC - quality control
-flexbar - adapters and quality trimming
-tophat - aligner
-cufflinks - transcripts assembly and quantification
-cuffmerge - merging of assemblies
-cuffcompare - corrrection of lost protein ids
-cuffquant - transcript expression profiles
-cuffdiff - differential expression analysis
+\nfastQC - quality control
+\nflexbar - adapters and quality trimming
+\ntophat - aligner
+\ncufflinks - transcripts assembly and quantification
+\ncuffmerge - merging of assemblies
+\ncuffcompare - corrrection of lost protein ids
+\ncuffquant - transcript expression profiles
+\ncuffdiff - differential expression analysis
 
 # tuxedo-slurm.sh #
 this script runs an full RNAseq pipeline under a slurm jobs distribution system \
