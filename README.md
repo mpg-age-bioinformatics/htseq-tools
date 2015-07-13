@@ -36,4 +36,4 @@ GO term. It also uses DAVID to perform GO enrichment analysis of biological proc
 cellular components,  and molecular function using significantly changed genes, <br />
 transcripts, promoter usage, splicing, CDS.
 
-Please read the instructions inside the script for usage. <br />
+usage: ```srun aDiff -h```<br />
