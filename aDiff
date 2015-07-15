@@ -57,17 +57,17 @@ if args.listDatasets:
     ensemblMart=biomaRt.useMart(args.mart)
     print(biomaRt.listDatasets(ensemblMart))
     sys.exit(0)
-                    
+
 if args.listFilters:
     biomaRt = importr("biomaRt")
     ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart) 
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
     print(biomaRt.listFilters(ensembl))
     sys.exit(0)
 
 if args.listAttributes:
     biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart) 
+    ensemblMart=biomaRt.useMart(args.mart)
     ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
     print(biomaRt.listAttributes(ensembl))
     sys.exit(0)
@@ -181,7 +181,7 @@ else:
     gene_name = pd.DataFrame(gene_name[0].str.split('"').tolist())[1]
     gene_name = pd.DataFrame(gene_name)
     print "Read gene names from GTF"
-    sys.stdout.flush()    
+    sys.stdout.flush()
 
     gene_id = pd.DataFrame(gtf[8].str.split('gene_id').tolist())[1]
     gene_id = gene_id.astype(str)
@@ -190,7 +190,7 @@ else:
     gene_id = pd.DataFrame(gene_id)
     print "Read gene ids from GTF"
     sys.stdout.flush()
-    
+
     name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
     name_id.columns = ['g_name','g_id']
     name_id = name_id[name_id['g_name'].isin(genes)]
@@ -222,7 +222,7 @@ else:
 
 
 # generate biotypes and go terms table using R/biomart output table.
-                
+
 if os.path.isfile(python_output+'/biotypes_go.txt'):
     print "\nUsing already existing biotypes_go.txt file"
     sys.stdout.flush()
@@ -252,7 +252,7 @@ else:
             ontology_gene_go.columns = ['GO_id','GO_term']
         else:
             ontology_gene_go = pd.DataFrame(columns = ['GO_id','GO_term'])
-        
+
         ontology_gene = ontology_gene[['gene_name','gene_biotype']].drop_duplicates()
         ontology_gene_go = ontology_gene_go.reset_index()
         ontology_gene = ontology_gene.reset_index()
@@ -272,11 +272,11 @@ else:
 def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
     from suds.client import Client
     import os
-   
+
     if len(listF) > 0 and os.path.exists(listF):
         inputListIds = ','.join(open(listF).read().split('\n'))
         print 'List loaded.'
-        sys.stdout.flush()        
+        sys.stdout.flush()
     else:
         print 'No list loaded.'
         sys.stdout.flush()
@@ -301,7 +301,7 @@ def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName=
     #print 'Percentage mapped(list):', client.service.addList(inputListIds,idType,listName,listType)
     print 'Percentage mapped(list): %s' %str(size)
     sys.stdout.flush()
-    if float(size) > float(0):    
+    if float(size) > float(0):
 
         if flagBg:
             listType = 1
@@ -310,12 +310,12 @@ def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName=
 
         print 'Use categories:', client.service.setCategories(category)
         sys.stdout.flush()
-       
+
         chartReport = client.service.getChartReport(thd,ct)
         chartRow = len(chartReport)
         print 'Total chart records:',chartRow
         sys.stdout.flush()
-    
+
         if len(resF) == 0 or not os.path.exists(resF):
             if flagBg:
                 resF = listF + '.withBG.chartReport'
@@ -342,19 +342,19 @@ def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName=
                 fOut.write('\t'.join(rowList)+'\n')
             print 'write file:', resF, 'finished!'
             sys.stdout.flush()
-        
+
 def DAVID_get(cat, filtered_table, all_genes_table):
     IDs_table = pd.merge(filtered_table, all_genes_table, how='left', left_on='identifier', right_on='g_name')
     IDs_table = IDs_table[['g_id']].dropna()
     IDs_table.to_csv('targets_tmp.txt',sep='\t',header=False,index=False)
-        
+
     background = all_genes_table[['g_id']].dropna()
     background.to_csv('background_tmp.txt',sep='\t',header=False,index=False)
-    
+
     DAVIDenrich(listF = './targets_tmp.txt', bgF = './background_tmp.txt', idType = DAVID_id, bgName = 'all_RNAseq_genes', listName = 'changed_genes', category = cat)
     if os.path.isfile('targets_tmp.txt.withBG.chartReport'):
         enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
-    	os.remove('targets_tmp.txt.withBG.chartReport')
+        os.remove('targets_tmp.txt.withBG.chartReport')
         terms=enrich['Term'].tolist()
         enrichN=pd.DataFrame()
         for term in terms:
@@ -373,11 +373,11 @@ def DAVID_get(cat, filtered_table, all_genes_table):
         enrichN=enrichN.reset_index(drop=True)
 
     else:
-	enrichN=pd.DataFrame()
- 
+    enrichN=pd.DataFrame()
+
     os.remove('targets_tmp.txt')
-    os.remove('background_tmp.txt')  
-    
+    os.remove('background_tmp.txt')
+
     return enrichN
 
 
@@ -412,12 +412,12 @@ for sig, label in zip(sig_choice,label_choice):
                     bp_sheets=[]
                     cc_sheets=[]
                     mf_sheets=[]
-		
+
                     writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
                     writer_cc = pd.ExcelWriter(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
                     writer_mf = pd.ExcelWriter(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
-                        
-        
+
+
             df = df.sort('p_value')
             df = df.sort('q_value')
             if sig == 'yes':
@@ -431,26 +431,26 @@ for sig, label in zip(sig_choice,label_choice):
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
             df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
-                     
+
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
                 t_id = pd.DataFrame(gtf[8].str.split('transcript_id').tolist())[1]
                 t_id = pd.DataFrame(t_id.str.split(';',1).tolist())
                 t_id = pd.DataFrame(t_id[0].str.split('"').tolist())[1]
-            
+
                 n_ref = pd.DataFrame(gtf[8].str.split('nearest_ref').tolist())[1]
                 n_ref = n_ref.astype(str)
                 n_ref = pd.DataFrame(n_ref.str.split(';',1).tolist())
                 n_ref = pd.DataFrame(n_ref[0].str.split('"').tolist())[1]
-            
+
                 id_ref = pd.concat([t_id, n_ref], axis=1).drop_duplicates()
                 id_ref.columns = ['transcript_id','nearest_ref']
-            
+
                 df = pd.merge(id_ref, df, how='right', left_on='transcript_id', right_on='test_id')
-              
+
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
-            	    	            
+
                 def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
                     if len(table_of_interest.index) >= 1:
                         enr = DAVID_get('GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT', table_of_interest, name_vs_id_table)
@@ -464,7 +464,7 @@ for sig, label in zip(sig_choice,label_choice):
                             if len(enr[enr['Category'] == 'GOTERM_MF_FAT']) > 0:
                                 enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, sheet_name, index=False)
                                 mf_sheets.append(sheet_name)
-				
+
                 sample1 = df[['sample_1']]
                 sample1.columns=['samples']
                 sample2 = df[['sample_2']]
@@ -493,14 +493,14 @@ for sig, label in zip(sig_choice,label_choice):
                                         print "\nPerforming gene ontology enrichment analysis on "+sample1+' vs. '+sample2
                                         sys.stdout.flush()
                                         DAVID_write(df_pair, name_id, sample1+'|'+sample2)
-            
+
                                     df_pair.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
-            
+
                                     if imp not in ['gene_exp.diff','isoform_exp.diff']:
                                         df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
-            
+
                                     df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
-        
+
                 for sample1 in samples:
                     for sample2 in samples:
                         if sample1 != sample2:
@@ -508,30 +508,30 @@ for sig, label in zip(sig_choice,label_choice):
                                 os.rmdir(sample1+sample2)
                             elif os.path.exists(sample2+sample1):
                                 os.rmdir(sample2+sample1)
-                            
+
             df.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
-          
+
             if imp not in ['gene_exp.diff','isoform_exp.diff']:
                 df.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
-        
+
             if sig == 'yes':
                 df.to_excel(writer, 'ALL', index=False)
                 writer.save()
-	        if args.DAVID:
-	            print "Closing DAVID's tables"
+            if args.DAVID:
+                print "Closing DAVID's tables"
                     if len(bp_sheets) == 0:
-	                df_empty=pd.DataFrame()
+                    df_empty=pd.DataFrame()
                         df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
                         writer_bp.save()
                         os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
                     else:
                         writer_bp.save()
- 
+
                     if len(cc_sheets) == 0:
                         df_empty=pd.DataFrame()
                         df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
-                    	writer_cc.save()
-                    	os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
+                        writer_cc.save()
+                        os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
                     else:
                         writer_cc.save()
 
@@ -542,13 +542,13 @@ for sig, label in zip(sig_choice,label_choice):
                         os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
                     else:
                         writer_mf.save()
-                                       
-    	if sig != 'yes':
-	    df.to_excel(writer, outshort+'_'+'ALL', index=False)
-	
+
+        if sig != 'yes':
+        df.to_excel(writer, outshort+'_'+'ALL', index=False)
+
     if sig != 'yes':
-	writer.save()
-                                       
+    writer.save()
+
 print "\nDone"
 print "\n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
 sys.exit()
