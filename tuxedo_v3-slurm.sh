@@ -157,9 +157,9 @@ else
 echo "#!/bin/bash
 module load pigz
 module load Flexbar
-flexbar -r ${tmp}${file::(-10)}1.fastq.gz \
--t ${top}raw_trimmed/${file::(-11)} \
--n 18 -a -a ${adapters_file} \
+flexbar -r ${tmp}${file::(-10)}1.fastq \
+-t ${top}raw_trimmed/${file::(-11)}_1 \
+-n 18 -a ${adapters_file} \
 -ao 10 -u 5 -q 20 -m 20 -f i1.5 -ae ANY
 cd ${top}raw_trimmed
 pigz -p 18 ${file::(-3)}
