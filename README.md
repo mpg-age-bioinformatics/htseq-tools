@@ -40,10 +40,15 @@ usage: ```srun aDiff -h```<br />
 
 #### QC.R
 
-this R scripts requires the cummeRbund package <br />
-```source('http://www.bioconductor.org/biocLite.R')
-biocLite('cummeRbund', ask=FALSE)``` <br />
+this R scripts requires the cummeRbund package
+
+[in R] ```source("http://www.bioconductor.org/biocLite.R")```
+
+[in R] ```biocLite('cummeRbund', ask=FALSE)``` 
+
 to perform a minimal quality control analysis on cuffdiff outputs.
 cummeRbund output folder needs to be created before using this script.
+Not all plot allways perform with every dataset - you might therefore need to <br />
+comment out some plots.
 
 usage: ```srun Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder```
