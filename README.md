@@ -42,7 +42,7 @@ usage: ```srun aDiff -h```<br />
 
 this R scripts requires the cummeRbund package
 
-[in R] ```source("http://www.bioconductor.org/biocLite.R")```
+[in R] ```source('http://www.bioconductor.org/biocLite.R')```
 
 [in R] ```biocLite('cummeRbund', ask=FALSE)``` 
 
