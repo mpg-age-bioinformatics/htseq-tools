@@ -37,3 +37,13 @@ cellular components,  and molecular function using significantly changed genes, 
 transcripts, promoter usage, splicing, CDS.
 
 usage: ```srun aDiff -h```<br />
+
+#### QC.R
+
+this R scripts requires the cummeRbund package <br />
+```source('http://www.bioconductor.org/biocLite.R')
+biocLite('cummeRbund', ask=FALSE)``` <br />
+to perform a minimal quality control analysis on cuffdiff outputs.
+cummeRbund output folder needs to be created before using this script.
+
+usage: ```srun Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder```
