@@ -46,8 +46,8 @@ this R scripts requires the cummeRbund package
 
 [in R] ```biocLite('cummeRbund', ask=FALSE)``` 
 
-to perform a minimal quality control analysis on cuffdiff outputs.
-cummeRbund output folder needs to be created before using this script.
+to perform a minimal quality control analysis on cuffdiff outputs. <br />
+cummeRbund output folder needs to be created before using this script. <br />
 Not all plot allways perform with every dataset - you might therefore need to <br />
 comment out some plots.
 
