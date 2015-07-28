@@ -1,3 +1,5 @@
+#!/bin/env Rscript
+
 rm(list = ls())
 
 args<-commandArgs(TRUE)
