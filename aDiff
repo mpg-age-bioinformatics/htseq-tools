@@ -373,7 +373,7 @@ def DAVID_get(cat, filtered_table, all_genes_table):
         enrichN=enrichN.reset_index(drop=True)
 
     else:
-    enrichN=pd.DataFrame()
+	enrichN=pd.DataFrame()
 
     os.remove('targets_tmp.txt')
     os.remove('background_tmp.txt')
