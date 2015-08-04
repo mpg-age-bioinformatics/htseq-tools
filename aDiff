@@ -519,29 +519,29 @@ for sig, label in zip(sig_choice,label_choice):
                 writer.save()
             if args.DAVID:
                 print "Closing DAVID's tables"
-                    if len(bp_sheets) == 0:
+                if len(bp_sheets) == 0:
                     df_empty=pd.DataFrame()
-                        df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
-                        writer_bp.save()
-                        os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
-                    else:
-                        writer_bp.save()
+                    df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
+                    writer_bp.save()
+                    os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
+                else:
+                    writer_bp.save()
 
-                    if len(cc_sheets) == 0:
-                        df_empty=pd.DataFrame()
-                        df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
-                        writer_cc.save()
-                        os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
-                    else:
-                        writer_cc.save()
+                if len(cc_sheets) == 0:
+                    df_empty=pd.DataFrame()
+                    df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
+                    writer_cc.save()
+                    os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
+                else:
+                    writer_cc.save()
 
-                    if len(mf_sheets) == 0:
-                        df_empty=pd.DataFrame()
-                        df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
-                        writer_mf.save()
-                        os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
-                    else:
-                        writer_mf.save()
+                if len(mf_sheets) == 0:
+                    df_empty=pd.DataFrame()
+                    df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
+                    writer_mf.save()
+                    os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
+                else:
+                    writer_mf.save()
 
         if sig != 'yes':
         df.to_excel(writer, outshort+'_'+'ALL', index=False)
