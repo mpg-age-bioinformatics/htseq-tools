@@ -270,8 +270,12 @@ else:
 ##################### Functions required for getting analysis from DAVID
 
 def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
+    #import ssl
+    #ssl._create_default_https_context = ssl._create_unverified_context
     from suds.client import Client
     import os
+    import ssl # fix
+    ssl._create_default_https_context = ssl._create_unverified_context # fix
 
     if len(listF) > 0 and os.path.exists(listF):
         inputListIds = ','.join(open(listF).read().split('\n'))
@@ -291,8 +295,9 @@ def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName=
     else:
         print 'Use default background.'
         sys.stdout.flush()
-
-    client = Client('http://david.abcc.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl')
+    
+    client = Client('https://david.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl') # new https url
+    client.wsdl.services[0].setlocation('https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap11Endpoint/') # fix
     print 'User Authentication:',client.service.authenticate(args.DAVIDuser)
     sys.stdout.flush()
 
