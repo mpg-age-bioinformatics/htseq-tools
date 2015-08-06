@@ -98,16 +98,27 @@ genes.PCA.rep
 dev.off()
 rm(genes.PCA.rep)
 
-#mySigGeneIds<-getSig(cuff,alpha=0.05,level='genes')
-#mySigGenes<-getGenes(cuff,mySigGeneIds)
+mySigGeneIds<-getSig(cuff,alpha=0.05,level='genes')
+mySigGenes<-getGenes(cuff,mySigGeneIds)
 
-#h<-csHeatmap(mySigGenes,cluster='both')
+h<-csHeatmap(mySigGenes,cluster='both')
+h$scales$scales[[2]]$labels <- sub("\\|.*", "",h$scales$scales[[2]]$labels)
+h$scales$scales[[2]]$labels <- sub(",.*", "",h$scales$scales[[2]]$labels)
+pdf(paste(output,"/heatmap.pdf",sep=""))
+h
+dev.off()
 #tiff(filename = paste(output,"/heatmap.tiff",sep=""),width=2400,height=1350)
 #h
 #dev.off()
-#rm(h)
+rm(h)
 
-#h.rep<-csHeatmap(mySigGenes,cluster='both',replicates=T)
+h.rep<-csHeatmap(mySigGenes,cluster='both',replicates=T)
+h.rep$scales$scales[[2]]$labels <- sub("\\|.*", "",h.rep$scales$scales[[2]]$labels)
+h.rep$scales$scales[[2]]$labels <- sub(",.*", "",h.rep$scales$scales[[2]]$labels)
+pdf(paste(output,"/heatmaprep.pdf",sep=""))
+h.rep
+dev.off()
+rm(h.rep)
 #tiff(filename = paste(output,"/heatmaprep.tiff",sep=""),width=2400,height=1350)
 #h.rep
 #dev.off()
