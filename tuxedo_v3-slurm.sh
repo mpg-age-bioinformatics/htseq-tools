@@ -245,7 +245,7 @@ printf 'Starting StringTie'
 
 module load StringTie
 stringtie ${file::(-16)}.bam -o ${top}V3_stringtie_output/${file::(-16)}.gtf \
--p 18 -G ${ori_GTF} \
+-p 18 -G ${ori_GTF} -f 1.0 \
 -C ${top}V3_stringtie_output/${file::(-16)}_full_cov.gtf \
 -b ${top}V3_stringtie_output/${file::(-16)} 
 rm ${tmp}V3_HS_ST_${file::(-16)}.sh" > ${tmp}V3_HS_ST_${file::(-16)}.sh
