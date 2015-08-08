@@ -508,8 +508,9 @@ for sig, label in zip(sig_choice,label_choice):
             if sig == 'yes':
                 df.to_excel(writer, 'ALL', index=False)
                 writer.save()
-
-
+                
+        if sig != 'yes':
+            df.to_excel(writer, outshort+'_'+'ALL', index=False)
     if sig != 'yes':
         writer.save()
 
