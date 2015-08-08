@@ -13,7 +13,7 @@ parser.add_argument("-o", "--outputFolder", help="Output folder")
 parser.add_argument("-G", "--originalGTF", help="Origianl/downloaded GTF")
 parser.add_argument("-C", "--cuffcompareGTF", help="Merged cuffcompared GTF")
 parser.add_argument("-f", "--inputFiles", help="Implies -s. Use this option to select which *.diff files you wish to analyse. Default: 'gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff'.", default='gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff')
-parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. Default: 'geneexp prom splic cds iso'.", default='geneexp prom splic cds iso')
+parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. No '.' (dots) allowed. Default: 'geneexp prom splic cds iso'.", default='geneexp prom splic cds iso')
 parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-labeled significantly changed genes", action="store_true")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
@@ -26,6 +26,7 @@ parser.add_argument("--listAttributes", help="List available attributes for your
 parser.add_argument("--outputBiotypes", help="Outputs/attributes for your biotypes data. Default='ensembl_gene_id gene_biotype'. Order has to be kept, ie. first IDs then biotype.", default='ensembl_gene_id gene_biotype')
 parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Default='ensembl_gene_id go_id name_1006'. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='ensembl_gene_id go_id name_1006')
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list. Default: 'WORMBASE_GENE_ID'", default='WORMBASE_GENE_ID')
+parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list. Default: 'GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE'", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
 args = parser.parse_args()
 
@@ -411,16 +412,16 @@ for sig, label in zip(sig_choice,label_choice):
                 writer = pd.ExcelWriter(python_output+'/'+label+'_'+outshort+'.xlsx')
                 print "Writting table "+label+"_"+outshort+".xlsx"
                 sys.stdout.flush()
-                if args.DAVID:
-                    print "Starting DAVID's tables"
-                    sys.stdout.flush()
-                    bp_sheets=[]
-                    cc_sheets=[]
-                    mf_sheets=[]
-
-                    writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
-                    writer_cc = pd.ExcelWriter(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
-                    writer_mf = pd.ExcelWriter(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
+#               if args.DAVID:
+#                    print "Starting DAVID's tables"
+#                    sys.stdout.flush()
+#                    bp_sheets=[]
+#                    cc_sheets=[]
+#                    mf_sheets=[]
+#
+#                    writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
+#                    writer_cc = pd.ExcelWriter(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
+#                    writer_mf = pd.ExcelWriter(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
 
 
             df = df.sort('p_value')
@@ -456,19 +457,25 @@ for sig, label in zip(sig_choice,label_choice):
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
 
+
+
                 def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
                     if len(table_of_interest.index) >= 1:
-                        enr = DAVID_get('GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT', table_of_interest, name_vs_id_table)
+                        enr = DAVID_get(args.DAVIDcat, table_of_interest, name_vs_id_table)
                         if len(enr.index) >= 1:
-                            if len(enr[enr['Category'] == 'GOTERM_BP_FAT']) > 0:
-                                enr[enr['Category'] == 'GOTERM_BP_FAT'].to_excel(writer_bp, sheet_name, index=False)
-                                bp_sheets.append(sheet_name)
-                            if len(enr[enr['Category'] == 'GOTERM_CC_FAT']) > 0:
-                                enr[enr['Category'] == 'GOTERM_CC_FAT'].to_excel(writer_cc, sheet_name, index=False)
-                                cc_sheets.append(sheet_name)
-                            if len(enr[enr['Category'] == 'GOTERM_MF_FAT']) > 0:
-                                enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, sheet_name, index=False)
-                                mf_sheets.append(sheet_name)
+                            recovered_cats=list(set(enr['Category'].tolist()))
+                            for c in recovered_cats:
+                                enr[enr['Category']==c].to_csv(python_output+"/DAVID."+c+"_"+label+"_"+outshort+"."+sheet_name+".tmp",index=False, sep="\t")
+
+#                            if len(enr[enr['Category'] == 'GOTERM_BP_FAT']) > 0:
+#                                enr[enr['Category'] == 'GOTERM_BP_FAT'].to_excel(writer_bp, sheet_name, index=False)
+#                                bp_sheets.append(sheet_name)
+#                            if len(enr[enr['Category'] == 'GOTERM_CC_FAT']) > 0:
+#                                enr[enr['Category'] == 'GOTERM_CC_FAT'].to_excel(writer_cc, sheet_name, index=False)
+#                                cc_sheets.append(sheet_name)
+#                            if len(enr[enr['Category'] == 'GOTERM_MF_FAT']) > 0:
+#                                enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, sheet_name, index=False)
+#                                mf_sheets.append(sheet_name)
 
                 sample1 = df[['sample_1']]
                 sample1.columns=['samples']
@@ -522,37 +529,60 @@ for sig, label in zip(sig_choice,label_choice):
             if sig == 'yes':
                 df.to_excel(writer, 'ALL', index=False)
                 writer.save()
-            if args.DAVID:
-                print "Closing DAVID's tables"
-                if len(bp_sheets) == 0:
-                    df_empty=pd.DataFrame()
-                    df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
-                    writer_bp.save()
-                    os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
-                else:
-                    writer_bp.save()
 
-                if len(cc_sheets) == 0:
-                    df_empty=pd.DataFrame()
-                    df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
-                    writer_cc.save()
-                    os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
-                else:
-                    writer_cc.save()
-
-                if len(mf_sheets) == 0:
-                    df_empty=pd.DataFrame()
-                    df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
-                    writer_mf.save()
-                    os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
-                else:
-                    writer_mf.save()
+#                if args.DAVID:
+#                    print "Closing DAVID's tables"
+#                    if len(bp_sheets) == 0:
+#                        df_empty=pd.DataFrame()
+#                        df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
+#                        writer_bp.save()
+#                        os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
+#                    else:
+#                        writer_bp.save()
+#
+#                        if len(cc_sheets) == 0:
+#                        df_empty=pd.DataFrame()
+#                        df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
+#                        writer_cc.save()
+#                        os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
+#                    else:
+#                        writer_cc.save()
+#
+#                    if len(mf_sheets) == 0:
+#                        df_empty=pd.DataFrame()
+#                        df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
+#                        writer_mf.save()
+#                        os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
+#                    else:
+#                        writer_mf.save()
 
         if sig != 'yes':
             df.to_excel(writer, outshort+'_'+'ALL', index=False)
 
     if sig != 'yes':
         writer.save()
+
+if args.DAVID:
+    DAVID_tmp_files=os.lisdir(python_output)
+    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "DAVID" in s ]
+    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "tmp" in s ]
+    cat_to_exc=[]
+    for f in DAVID_tmp_files:
+        c=f.split(".")[1]
+        cat_to_exc.append(c)
+    cat_to_exc=list(set(cat_to_exc))
+    for c in cat_to_exc:
+        writer = pd.ExcelWriter(python_output+'/'+c+'.xlsx')
+        cat_files=[s for s in DAVID_tmp_files if c in s]
+        for f in cat_files:
+            df=pd.read_table(python_output+'/'+f)
+            sheet_name=f.split(".")[2]
+            df.to_excel(writer_bp, sheet_name, index=False)
+        writer.save()
+
+    for f DAVID_tmp_files:
+        os.remove(python_output+'/'+f)
+
 
 print "\nDone"
 print "\n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
