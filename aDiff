@@ -502,7 +502,7 @@ for sig, label in zip(sig_choice,label_choice):
                                     os.makedirs(sample1+sample2)
                                     df_pair = df[df['sample_1'].isin([sample1,sample2])][df['sample_2'].isin([sample1,sample2])]
                                     if args.DAVID:
-                                        print "\nPerforming gene ontology enrichment analysis on "+sample1+' vs. '+sample2
+                                        print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
                                         sys.stdout.flush()
                                         DAVID_write(df_pair, name_id, sample1+'|'+sample2)
 
@@ -563,7 +563,7 @@ for sig, label in zip(sig_choice,label_choice):
         writer.save()
 
 if args.DAVID:
-    DAVID_tmp_files=os.lisdir(python_output)
+    DAVID_tmp_files=os.listdir(python_output)
     DAVID_tmp_files=[ s for s in DAVID_tmp_files if "DAVID" in s ]
     DAVID_tmp_files=[ s for s in DAVID_tmp_files if "tmp" in s ]
     cat_to_exc=[]
@@ -577,10 +577,10 @@ if args.DAVID:
         for f in cat_files:
             df=pd.read_table(python_output+'/'+f)
             sheet_name=f.split(".")[2]
-            df.to_excel(writer_bp, sheet_name, index=False)
+            df.to_excel(writer, sheet_name, index=False)
         writer.save()
 
-    for f DAVID_tmp_files:
+    for f in DAVID_tmp_files:
         os.remove(python_output+'/'+f)
 
 
