@@ -412,17 +412,6 @@ for sig, label in zip(sig_choice,label_choice):
                 writer = pd.ExcelWriter(python_output+'/'+label+'_'+outshort+'.xlsx')
                 print "Writting table "+label+"_"+outshort+".xlsx"
                 sys.stdout.flush()
-#               if args.DAVID:
-#                    print "Starting DAVID's tables"
-#                    sys.stdout.flush()
-#                    bp_sheets=[]
-#                    cc_sheets=[]
-#                    mf_sheets=[]
-#
-#                    writer_bp = pd.ExcelWriter(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
-#                    writer_cc = pd.ExcelWriter(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
-#                    writer_mf = pd.ExcelWriter(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
-
 
             df = df.sort('p_value')
             df = df.sort('q_value')
@@ -466,16 +455,6 @@ for sig, label in zip(sig_choice,label_choice):
                             recovered_cats=list(set(enr['Category'].tolist()))
                             for c in recovered_cats:
                                 enr[enr['Category']==c].to_csv(python_output+"/DAVID."+c+"_"+label+"_"+outshort+"."+sheet_name+".tmp",index=False, sep="\t")
-
-#                            if len(enr[enr['Category'] == 'GOTERM_BP_FAT']) > 0:
-#                                enr[enr['Category'] == 'GOTERM_BP_FAT'].to_excel(writer_bp, sheet_name, index=False)
-#                                bp_sheets.append(sheet_name)
-#                            if len(enr[enr['Category'] == 'GOTERM_CC_FAT']) > 0:
-#                                enr[enr['Category'] == 'GOTERM_CC_FAT'].to_excel(writer_cc, sheet_name, index=False)
-#                                cc_sheets.append(sheet_name)
-#                            if len(enr[enr['Category'] == 'GOTERM_MF_FAT']) > 0:
-#                                enr[enr['Category'] == 'GOTERM_MF_FAT'].to_excel(writer_mf, sheet_name, index=False)
-#                                mf_sheets.append(sheet_name)
 
                 sample1 = df[['sample_1']]
                 sample1.columns=['samples']
@@ -530,34 +509,6 @@ for sig, label in zip(sig_choice,label_choice):
                 df.to_excel(writer, 'ALL', index=False)
                 writer.save()
 
-#                if args.DAVID:
-#                    print "Closing DAVID's tables"
-#                    if len(bp_sheets) == 0:
-#                        df_empty=pd.DataFrame()
-#                        df_empty.to_excel(writer_bp, "nothing_to_report", index=False)
-#                        writer_bp.save()
-#                        os.remove(python_output+'/bio_process_'+label+'_'+outshort+'.xlsx')
-#                    else:
-#                        writer_bp.save()
-#
-#                        if len(cc_sheets) == 0:
-#                        df_empty=pd.DataFrame()
-#                        df_empty.to_excel(writer_cc, "nothing_to_report", index=False)
-#                        writer_cc.save()
-#                        os.remove(python_output+'/cell_component_'+label+'_'+outshort+'.xlsx')
-#                    else:
-#                        writer_cc.save()
-#
-#                    if len(mf_sheets) == 0:
-#                        df_empty=pd.DataFrame()
-#                        df_empty.to_excel(writer_mf, "nothing_to_report", index=False)
-#                        writer_mf.save()
-#                        os.remove(python_output+'/mol_function_'+label+'_'+outshort+'.xlsx')
-#                    else:
-#                        writer_mf.save()
-
-        if sig != 'yes':
-            df.to_excel(writer, outshort+'_'+'ALL', index=False)
 
     if sig != 'yes':
         writer.save()
