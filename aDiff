@@ -43,7 +43,6 @@ install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
     sys.exit(0)
 
-
 import pandas as pd
 import numpy as np
 import rpy2.robjects as robjects
@@ -52,7 +51,6 @@ from bioservices.kegg import KEGG
 import time
 from datetime import datetime
 import shutil
-
 
 if args.listMarts:
     biomaRt = importr("biomaRt")
@@ -92,7 +90,6 @@ python_output = args.outputFolder
 genomes_folder=original_gtf.split('/')
 genomes_folder=genomes_folder[0:len(genomes_folder)-1]
 genomes_folder="/".join(genomes_folder)
-
 
 if not os.path.exists(python_output):
     os.makedirs(python_output)
@@ -139,16 +136,6 @@ out_biot=out_biot.split()
 out_go=args.outputGoterms
 out_go=out_go.split()
 
-############### Check available BioMart data ######################
-#biomaRt = importr("biomaRt") # do not quote
-#print(biomaRt.listMarts())
-#ensemblMart=biomaRt.useMart(args.mart) # do not quote
-#print(biomaRt.listDatasets(ensemblMart))
-#ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart) # do not quote
-#print(biomaRt.listFilters(ensembl))
-#print(biomaRt.listAttributes(ensembl))
-###################################################################
-
 ############### Set Biomart resources ######################
 dataset = args.dataset
 data_filter = args.filter # filter for gene_id in GTF file, 'link_ensembl_gene_id'
@@ -161,6 +148,7 @@ data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
 DAVID_id=args.DAVIDid
 ####################################################################
 
+
 ############### FUNCTIONS ############
 
 def retrieve_GTF_field(field,gtf):
@@ -171,8 +159,121 @@ def retrieve_GTF_field(field,gtf):
     field = pd.DataFrame(field)
     return field
 
+def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
+    #import ssl
+    #ssl._create_default_https_context = ssl._create_unverified_context
+    from suds.client import Client
+    import os
+    import ssl # fix
+    ssl._create_default_https_context = ssl._create_unverified_context # fix
 
+    if len(listF) > 0 and os.path.exists(listF):
+        inputListIds = ','.join(open(listF).read().split('\n'))
+        print 'List loaded.'
+        sys.stdout.flush()
+    else:
+        print 'No list loaded.'
+        sys.stdout.flush()
+        raise
 
+    flagBg = False
+    if len(bgF) > 0 and os.path.exists(bgF):
+        inputBgIds = ','.join(open(bgF).read().split('\n'))
+        flagBg = True
+        print 'Use file background.'
+        sys.stdout.flush()
+    else:
+        print 'Use default background.'
+        sys.stdout.flush()
+    
+    client = Client('https://david.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl') # new https url
+    client.wsdl.services[0].setlocation('https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap11Endpoint/') # fix
+    print 'User Authentication:',client.service.authenticate(args.DAVIDuser)
+    sys.stdout.flush()
+
+    listType = 0
+    size=client.service.addList(inputListIds,idType,listName,listType)
+    #print 'Percentage mapped(list):', client.service.addList(inputListIds,idType,listName,listType)
+    print 'Percentage mapped(list): %s' %str(size)
+    sys.stdout.flush()
+    if float(size) > float(0):
+
+        if flagBg:
+            listType = 1
+            print 'Percentage mapped(background):', client.service.addList(inputBgIds,idType,bgName,listType)
+            sys.stdout.flush()
+
+        print 'Use categories:', client.service.setCategories(category)
+        sys.stdout.flush()
+
+        chartReport = client.service.getChartReport(thd,ct)
+        chartRow = len(chartReport)
+        print 'Total chart records:',chartRow
+        sys.stdout.flush()
+
+        if len(resF) == 0 or not os.path.exists(resF):
+            if flagBg:
+                resF = listF + '.withBG.chartReport'
+            else:
+                resF = listF + '.chartReport'
+        with open(resF, 'w') as fOut:
+            fOut.write('Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n')
+            for row in chartReport:
+                rowDict = dict(row)
+                categoryName = str(rowDict['categoryName'])
+                termName = str(rowDict['termName'])
+                listHits = str(rowDict['listHits'])
+                percent = str(rowDict['percent'])
+                ease = str(rowDict['ease'])
+                Genes = str(rowDict['geneIds'])
+                listTotals = str(rowDict['listTotals'])
+                popHits = str(rowDict['popHits'])
+                popTotals = str(rowDict['popTotals'])
+                foldEnrichment = str(rowDict['foldEnrichment'])
+                bonferroni = str(rowDict['bonferroni'])
+                benjamini = str(rowDict['benjamini'])
+                FDR = str(rowDict['afdr'])
+                rowList = [categoryName,termName,listHits,percent,ease,Genes,listTotals,popHits,popTotals,foldEnrichment,bonferroni,benjamini,FDR]
+                fOut.write('\t'.join(rowList)+'\n')
+            print 'write file:', resF, 'finished!'
+            sys.stdout.flush()
+
+def DAVID_get(cat, filtered_table, all_genes_table):
+    IDs_table = pd.merge(filtered_table, all_genes_table, how='left', left_on='identifier', right_on='g_name')
+    IDs_table = IDs_table[['g_id']].dropna()
+    IDs_table.to_csv('targets_tmp.txt',sep='\t',header=False,index=False)
+
+    background = all_genes_table[['g_id']].dropna()
+    background.to_csv('background_tmp.txt',sep='\t',header=False,index=False)
+
+    DAVIDenrich(listF = './targets_tmp.txt', bgF = './background_tmp.txt', idType = DAVID_id, bgName = 'all_RNAseq_genes', listName = 'changed_genes', category = cat)
+    if os.path.isfile('targets_tmp.txt.withBG.chartReport'):
+        enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
+        os.remove('targets_tmp.txt.withBG.chartReport')
+        terms=enrich['Term'].tolist()
+        enrichN=pd.DataFrame()
+        for term in terms:
+            tmp=enrich[enrich['Term']==term]
+            tmp=tmp.reset_index(drop=True)
+            ids=tmp.xs(0)['Genes']
+            ids=pd.DataFrame(data=ids.split(", "))
+            ids.columns=['g_id']
+            ids['g_id']=ids['g_id'].map(str.lower)
+            all_genes_table['g_id']=all_genes_table['g_id'].map(str.lower)
+            ids=pd.merge(ids, all_genes_table, how='left', left_on='g_id', right_on='g_id')
+            names=ids['g_name'].tolist()
+            names = ', '.join(names)
+            tmp=tmp.replace(to_replace=tmp.xs(0)['Genes'], value=names)
+            enrichN=pd.concat([enrichN, tmp])
+        enrichN=enrichN.reset_index(drop=True)
+
+    else:
+	enrichN=pd.DataFrame()
+
+    os.remove('targets_tmp.txt')
+    os.remove('background_tmp.txt')
+
+    return enrichN
 
 ###################### START #####################
 
@@ -362,133 +463,13 @@ else:
 	dfK=pd.concat([dfK,tmp])
     dfK.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
 
-##################### Functions required for getting analysis from DAVID
-
-def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
-    #import ssl
-    #ssl._create_default_https_context = ssl._create_unverified_context
-    from suds.client import Client
-    import os
-    import ssl # fix
-    ssl._create_default_https_context = ssl._create_unverified_context # fix
-
-    if len(listF) > 0 and os.path.exists(listF):
-        inputListIds = ','.join(open(listF).read().split('\n'))
-        print 'List loaded.'
-        sys.stdout.flush()
-    else:
-        print 'No list loaded.'
-        sys.stdout.flush()
-        raise
-
-    flagBg = False
-    if len(bgF) > 0 and os.path.exists(bgF):
-        inputBgIds = ','.join(open(bgF).read().split('\n'))
-        flagBg = True
-        print 'Use file background.'
-        sys.stdout.flush()
-    else:
-        print 'Use default background.'
-        sys.stdout.flush()
-    
-    client = Client('https://david.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl') # new https url
-    client.wsdl.services[0].setlocation('https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap11Endpoint/') # fix
-    print 'User Authentication:',client.service.authenticate(args.DAVIDuser)
-    sys.stdout.flush()
-
-    listType = 0
-    size=client.service.addList(inputListIds,idType,listName,listType)
-    #print 'Percentage mapped(list):', client.service.addList(inputListIds,idType,listName,listType)
-    print 'Percentage mapped(list): %s' %str(size)
-    sys.stdout.flush()
-    if float(size) > float(0):
-
-        if flagBg:
-            listType = 1
-            print 'Percentage mapped(background):', client.service.addList(inputBgIds,idType,bgName,listType)
-            sys.stdout.flush()
-
-        print 'Use categories:', client.service.setCategories(category)
-        sys.stdout.flush()
-
-        chartReport = client.service.getChartReport(thd,ct)
-        chartRow = len(chartReport)
-        print 'Total chart records:',chartRow
-        sys.stdout.flush()
-
-        if len(resF) == 0 or not os.path.exists(resF):
-            if flagBg:
-                resF = listF + '.withBG.chartReport'
-            else:
-                resF = listF + '.chartReport'
-        with open(resF, 'w') as fOut:
-            fOut.write('Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n')
-            for row in chartReport:
-                rowDict = dict(row)
-                categoryName = str(rowDict['categoryName'])
-                termName = str(rowDict['termName'])
-                listHits = str(rowDict['listHits'])
-                percent = str(rowDict['percent'])
-                ease = str(rowDict['ease'])
-                Genes = str(rowDict['geneIds'])
-                listTotals = str(rowDict['listTotals'])
-                popHits = str(rowDict['popHits'])
-                popTotals = str(rowDict['popTotals'])
-                foldEnrichment = str(rowDict['foldEnrichment'])
-                bonferroni = str(rowDict['bonferroni'])
-                benjamini = str(rowDict['benjamini'])
-                FDR = str(rowDict['afdr'])
-                rowList = [categoryName,termName,listHits,percent,ease,Genes,listTotals,popHits,popTotals,foldEnrichment,bonferroni,benjamini,FDR]
-                fOut.write('\t'.join(rowList)+'\n')
-            print 'write file:', resF, 'finished!'
-            sys.stdout.flush()
-
-def DAVID_get(cat, filtered_table, all_genes_table):
-    IDs_table = pd.merge(filtered_table, all_genes_table, how='left', left_on='identifier', right_on='g_name')
-    IDs_table = IDs_table[['g_id']].dropna()
-    IDs_table.to_csv('targets_tmp.txt',sep='\t',header=False,index=False)
-
-    background = all_genes_table[['g_id']].dropna()
-    background.to_csv('background_tmp.txt',sep='\t',header=False,index=False)
-
-    DAVIDenrich(listF = './targets_tmp.txt', bgF = './background_tmp.txt', idType = DAVID_id, bgName = 'all_RNAseq_genes', listName = 'changed_genes', category = cat)
-    if os.path.isfile('targets_tmp.txt.withBG.chartReport'):
-        enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
-        os.remove('targets_tmp.txt.withBG.chartReport')
-        terms=enrich['Term'].tolist()
-        enrichN=pd.DataFrame()
-        for term in terms:
-            tmp=enrich[enrich['Term']==term]
-            tmp=tmp.reset_index(drop=True)
-            ids=tmp.xs(0)['Genes']
-            ids=pd.DataFrame(data=ids.split(", "))
-            ids.columns=['g_id']
-            ids['g_id']=ids['g_id'].map(str.lower)
-            all_genes_table['g_id']=all_genes_table['g_id'].map(str.lower)
-            ids=pd.merge(ids, all_genes_table, how='left', left_on='g_id', right_on='g_id')
-            names=ids['g_name'].tolist()
-            names = ', '.join(names)
-            tmp=tmp.replace(to_replace=tmp.xs(0)['Genes'], value=names)
-            enrichN=pd.concat([enrichN, tmp])
-        enrichN=enrichN.reset_index(drop=True)
-
-    else:
-	enrichN=pd.DataFrame()
-
-    os.remove('targets_tmp.txt')
-    os.remove('background_tmp.txt')
-
-    return enrichN
-
 
 # create excel report tables
 print "\nCreating excel report tables"
 sys.stdout.flush()
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
-
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-
 KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_id','KEGG_id','KEGG_pathway'])
 KEGG.columns=['identifier','KEGG_id','KEGG_pathway']
 
@@ -523,7 +504,7 @@ for sig, label in zip(sig_choice,label_choice):
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
             df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
-	    df = pd.merge(df,KEGG, how='left', on='identifier') 
+	        df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
@@ -537,8 +518,6 @@ for sig, label in zip(sig_choice,label_choice):
 
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
-
-
 
                 def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
                     if len(table_of_interest.index) >= 1:
@@ -556,7 +535,7 @@ for sig, label in zip(sig_choice,label_choice):
                 samples=samples.drop_duplicates()
                 samples=samples['samples'].tolist()
 
-		readyList=[]
+		        readyList=[]
 
                 for sample1 in samples:
                     for sample2 in samples:
