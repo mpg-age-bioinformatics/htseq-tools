@@ -51,6 +51,8 @@ from rpy2.robjects.packages import importr
 from bioservices.kegg import KEGG
 import time
 from datetime import datetime
+import shutil
+
 
 if args.listMarts:
     biomaRt = importr("biomaRt")
@@ -87,6 +89,10 @@ diff_out = os.path.realpath(args.inputFolder)
 original_gtf = os.path.realpath(args.originalGTF)
 merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
 python_output = args.outputFolder
+genomes_folder=original_gtf.split('/')
+genomes_folder=genomes_folder[0:len(genomes_folder)-1]
+genomes_folder="/".join(genomes_folder)
+
 
 if not os.path.exists(python_output):
     os.makedirs(python_output)
@@ -216,9 +222,15 @@ else:
 
 # Use R and BioMart to retrieve biotypes and gene ontoloty information
 
-if os.path.isfile(python_output+'/biotypes_go_raw.txt'):
+if os.path.isfile(genomes_folder+'/biotypes_go_raw.txt'):
+    print "\nCopying already existing biotypes_go_raw.txt file from genomes folder: "+str(genomes_folder)+"."
+    sys.stdout.flush()
+    shutil.copy(genomes_folder+'/biotypes_go_raw.txt', python_output+'/biotypes_go_raw.txt')
+
+elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
     print "\nUsing already existing biotypes_go_raw.txt file"
     sys.stdout.flush()
+
 else:
     print "\nRetrieving biotypes and gene ontoloy information"
     sys.stdout.flush()
@@ -233,7 +245,12 @@ else:
 
 # generate biotypes and go terms table using R/biomart output table.
 
-if os.path.isfile(python_output+'/biotypes_go.txt'):
+if os.path.isfile(genomes_folder+'/biotypes_go.txt'):
+    print "\nCopying already existing biotypes_go.txt file from genomes folder: "+str(genomes_folder)+"."
+    sys.stdout.flush()
+    shutil.copy(genomes_folder+'/biotypes_go.txt', python_output+'/biotypes_go.txt')
+
+elif os.path.isfile(python_output+'/biotypes_go.txt'):
     print "\nUsing already existing biotypes_go.txt file"
     sys.stdout.flush()
 else:
@@ -278,9 +295,15 @@ else:
 
 # generate KEGG table
 
-if os.path.isfile(python_output+'/KEGG.txt'):
+if os.path.isfile(genomes_folder+'/KEGG.txt'):
+    print "\nCopying already existing KEGG.txt file from genomes folder: "+str(genomes_folder)+"."
+    sys.stdout.flush()
+    shutil.copy(genomes_folder+'/KEGG.txt', python_output+'/KEGG.txt')
+
+elif os.path.isfile(python_output+'/KEGG.txt'):
     print "\nUsing already existing KEGG.txt file"
     sys.stdout.flush()
+
 else:
     print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
     sys.stdout.flush()
@@ -288,43 +311,46 @@ else:
     genes=name_id['g_name'].tolist()
     dfK=pd.DataFrame()
     for g,i in zip(genes,range(len(genes))):
-        sys.stdout.write("\r%s\t%s%s done: \t%s\t" %(str(datetime.now())[:16],str ( round ((float(i+1)/float(len(genes))*100), 2 ) ),"%",g)  )      
+        sys.stdout.write("\n%s\t%s%s done: \t%s\t" %(str(datetime.now())[:16],str ( round ((float(i+1)/float(len(genes))*100), 2 ) ),"%",g)  ) #\r      
         sys.stdout.flush()  
         tmp=name_id[name_id['g_name']==g]
         g_id=tmp["g_id"].tolist()[0]
-		k = KEGG()
-		f = k.find(args.KEGGorg, g)
-		if f != "\n":
-	    	f = f.split("\n")
-	    	founds=[]	
-	    	for i in f:
-	        	found=i.split("\t")[0]    
-	        	if found != "":
-	            	Eid=k.get(found)
-		    		Eid=Eid.split("Ensembl: ")[1]
-		    		Eid=Eid.split("\n")[0]
-		    		if Eif == g_id:
-						founds.append(found)
-	
-
-	else:
-	    res="Gene not found in KEGG"
-	
-if len
-
-
-
+	k = KEGG()
+	f = k.find(args.KEGGorg, g)
 	if f != "\n":
-	    res = k.get_pathway_by_gene(g, args.KEGGorg)
-            res=pd.DataFrame(res, index=[0])
-            res=res.transpose()
-            res=res[0].tolist()
-	    if len(res) > 0:
+	    f = f.split("\n")
+	    founds=[]	
+	    for i in f:
+	       	found=i.split("\t")[0]    
+	       	if found != "":
+		    Eid=k.get(found)
+                    if "Ensembl: " in Eid:
+		        Eid=Eid.split("Ensembl: ")[1]
+		        Eid=Eid.split("\n")[0]
+		        if Eid == g_id:
+			    founds.append(found)
+            if len(founds) > 0:
+		res=[]
+	        for i in founds:
+		    i = i.split(":")[1]
+		    r = k.get_pathway_by_gene(i, args.KEGGorg)
+		    if r != "\n":
+		        r = pd.DataFrame(r, index=[0])
+		        r = r.transpose()
+		        r = r[0].tolist()
+			r = ", ".join(r)
+		    else:
+			r="no pathway found for "+str(i)
+		    res.append(r)
 	        res="; ".join(res)
-	    else:
-	        res="no pathway found"
-        else:
-	    res="gene not found in KEGG"
+            else:
+                res="no matching Ensembl ID in KEGG; no pathway found"	
+		founds=['no matching Ensembl ID in KEGG']
+	else:
+	    res="Gene not found in KEGG; no pathway found"
+	    founds=['no matching Ensembl ID in KEGG']
+
+	tmp["KEGG_id"]="; ".join(founds)
         tmp["KEGG_pathway"]=res
 	dfK=pd.concat([dfK,tmp])
     dfK.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
@@ -456,8 +482,8 @@ bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
 
-KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_id','KEGG_pathway'])
-KEGG.columns=['identifier','KEGG_pathway']
+KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_id','KEGG_id','KEGG_pathway'])
+KEGG.columns=['identifier','KEGG_id','KEGG_pathway']
 
 for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
