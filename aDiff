@@ -504,7 +504,7 @@ for sig, label in zip(sig_choice,label_choice):
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
             df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
-	        df = pd.merge(df,KEGG, how='left', on='identifier') 
+            df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
@@ -535,7 +535,7 @@ for sig, label in zip(sig_choice,label_choice):
                 samples=samples.drop_duplicates()
                 samples=samples['samples'].tolist()
 
-		        readyList=[]
+                readyList=[]
 
                 for sample1 in samples:
                     for sample2 in samples:
