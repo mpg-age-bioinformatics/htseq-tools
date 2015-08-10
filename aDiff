@@ -541,7 +541,7 @@ for sig, label in zip(sig_choice,label_choice):
                     for sample2 in samples:
                         if sample1 != sample2:
                             if sample1+sample2 not in readyList :
-                                if sample2+sample not in readyList :
+                                if sample2+sample1 not in readyList :
 
                                     readyList.append(sample1+sample2)
                                     df_pair = df[df['sample_1'].isin([sample1,sample2])][df['sample_2'].isin([sample1,sample2])]
