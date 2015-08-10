@@ -161,6 +161,21 @@ data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
 DAVID_id=args.DAVIDid
 ####################################################################
 
+############### FUNCTIONS ############
+
+def retrieve_GTF_field(field,gtf):
+    field = pd.DataFrame(gtf[8].str.split(field).tolist())[1]
+    field = field.astype(str)
+    field = pd.DataFrame(field.str.split(';',1).tolist())
+    field = pd.DataFrame(field[0].str.split('"').tolist())[1]
+    field = pd.DataFrame(field)
+    return field
+
+
+
+
+###################### START #####################
+
 os.chdir(diff_out)
 
 ########## Get list of gene names and respective ids present in the data set
@@ -191,19 +206,11 @@ else:
     sys.stdout.flush()
     gtf = gtf.astype(str)
 
-    gene_name = pd.DataFrame(gtf[8].str.split('gene_name').tolist())[1]
-    gene_name = gene_name.astype(str)
-    gene_name = pd.DataFrame(gene_name.str.split(';',1).tolist())
-    gene_name = pd.DataFrame(gene_name[0].str.split('"').tolist())[1]
-    gene_name = pd.DataFrame(gene_name)
+    gene_name = retrieve_GTF_field('gene_name',gtf)
     print "Read gene names from GTF"
     sys.stdout.flush()
 
-    gene_id = pd.DataFrame(gtf[8].str.split('gene_id').tolist())[1]
-    gene_id = gene_id.astype(str)
-    gene_id = pd.DataFrame(gene_id.str.split(';',1).tolist())
-    gene_id = pd.DataFrame(gene_id[0].str.split('"').tolist())[1]
-    gene_id = pd.DataFrame(gene_id)
+    gene_id = retrieve_GTF_field('gene_id',gtf)
     print "Read gene ids from GTF"
     sys.stdout.flush()
 
@@ -520,14 +527,8 @@ for sig, label in zip(sig_choice,label_choice):
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
-                t_id = pd.DataFrame(gtf[8].str.split('transcript_id').tolist())[1]
-                t_id = pd.DataFrame(t_id.str.split(';',1).tolist())
-                t_id = pd.DataFrame(t_id[0].str.split('"').tolist())[1]
-
-                n_ref = pd.DataFrame(gtf[8].str.split('nearest_ref').tolist())[1]
-                n_ref = n_ref.astype(str)
-                n_ref = pd.DataFrame(n_ref.str.split(';',1).tolist())
-                n_ref = pd.DataFrame(n_ref[0].str.split('"').tolist())[1]
+                t_id = retrieve_GTF_field('transcript_id',gtf)    
+                n_ref = retrieve_GTF_field('nearest_ref',gtf)
 
                 id_ref = pd.concat([t_id, n_ref], axis=1).drop_duplicates()
                 id_ref.columns = ['transcript_id','nearest_ref']
@@ -555,21 +556,15 @@ for sig, label in zip(sig_choice,label_choice):
                 samples=samples.drop_duplicates()
                 samples=samples['samples'].tolist()
 
-                for sample1 in samples:
-                    for sample2 in samples:
-                        if sample1 != sample2:
-                            if os.path.exists(sample1+sample2):
-                                os.rmdir(sample1+sample2)
-                            elif os.path.exists(sample2+sample1):
-                                os.rmdir(sample2+sample1)
+		readyList=[]
 
                 for sample1 in samples:
                     for sample2 in samples:
                         if sample1 != sample2:
-                            if not os.path.exists(sample1+sample2):
-                                if not os.path.exists(sample2+sample1):
+                            if sample1+sample2 not in readyList :
+                                if sample2+sample not in readyList :
 
-                                    os.makedirs(sample1+sample2)
+                                    readyList.append(sample1+sample2)
                                     df_pair = df[df['sample_1'].isin([sample1,sample2])][df['sample_2'].isin([sample1,sample2])]
                                     if args.DAVID:
                                         print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
@@ -583,13 +578,6 @@ for sig, label in zip(sig_choice,label_choice):
 
                                     df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
 
-                for sample1 in samples:
-                    for sample2 in samples:
-                        if sample1 != sample2:
-                            if os.path.exists(sample1+sample2):
-                                os.rmdir(sample1+sample2)
-                            elif os.path.exists(sample2+sample1):
-                                os.rmdir(sample2+sample1)
 
             df.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
 
