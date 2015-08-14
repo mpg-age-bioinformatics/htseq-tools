@@ -15,6 +15,7 @@ parser.add_argument("-C", "--cuffcompareGTF", help="Merged cuffcompared GTF")
 parser.add_argument("-f", "--inputFiles", help="Implies -s. Use this option to select which *.diff files you wish to analyse. Default: 'gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff'.", default='gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff')
 parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. No '.' (dots) allowed. Default: 'geneexp prom splic cds iso'.", default='geneexp prom splic cds iso')
 parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-labeled significantly changed genes", action="store_true")
+parser.add_argument("--TSV", help="For p values > = 1 write tables as tab separated values", action="store_strue")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
 parser.add_argument("--mart", help="Your mart of choice. Default='ensembl'", default='ensembl')
@@ -402,7 +403,7 @@ else:
     del name_id, ontology, genes, ontology_gene, ontology_gene_go, ontology_gene_go_number, ontology_gene_go_name, final
 
 # generate KEGG table
-
+'''
 if os.path.isfile(genomes_folder+'/KEGG.txt'):
     print "\nCopying already existing KEGG.txt file from genomes folder: "+str(genomes_folder)+"."
     sys.stdout.flush()
@@ -462,7 +463,7 @@ else:
         tmp["KEGG_pathway"]=res
 	dfK=pd.concat([dfK,tmp])
     dfK.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
-
+'''
 
 # create excel report tables
 print "\nCreating excel report tables"
@@ -470,11 +471,18 @@ sys.stdout.flush()
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_id','KEGG_id','KEGG_pathway'])
-KEGG.columns=['identifier','KEGG_id','KEGG_pathway']
+#KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_id','KEGG_id','KEGG_pathway'])
+#KEGG.columns=['identifier','KEGG_id','KEGG_pathway']
 
 for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
+        if sig >= 1:
+            if args.TSV:
+		print "For "+str(label_choice)+" files will be saved as tsv"
+            else:
+                writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
+
+	else:
         writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
         print "\nWritting table "+label+".xlsx"
         sys.stdout.flush()
@@ -504,7 +512,7 @@ for sig, label in zip(sig_choice,label_choice):
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
             df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
-            df = pd.merge(df,KEGG, how='left', on='identifier') 
+#            df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
@@ -568,8 +576,21 @@ for sig, label in zip(sig_choice,label_choice):
                 writer.save()
                 
         if sig != 'yes':
-            df.to_excel(writer, outshort+'_'+'ALL', index=False)
+            if sig >= 1:
+                if args.TSV:
+                    df.to_csv(outshort+'_'+'ALL.tsv', index=False)
+                else:
+                    df.to_excel(writer, outshort+'_'+'ALL', index=False)
+
+            else:
+                df.to_excel(writer, outshort+'_'+'ALL', index=False)
+
     if sig != 'yes':
+        if sig >= 1:
+            if args.TSV:
+                print "For "+str(label_choice)+" files were saved as tsv" 
+            else:
+	        writer.save()
         writer.save()
 
 if args.DAVID:
