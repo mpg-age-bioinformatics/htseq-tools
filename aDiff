@@ -10,12 +10,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-D", "--DAVID", help="Use this flag to perform DAVID GO enrichment analysis", action="store_true")
 parser.add_argument("-i", "--inputFolder", help="Cuffdiff output folder")
 parser.add_argument("-o", "--outputFolder", help="Output folder")
-parser.add_argument("-G", "--originalGTF", help="Origianl/downloaded GTF")
+parser.add_argument("-G", "--originalGTF", help="Original/downloaded GTF")
 parser.add_argument("-C", "--cuffcompareGTF", help="Merged cuffcompared GTF")
 parser.add_argument("-f", "--inputFiles", help="Implies -s. Use this option to select which *.diff files you wish to analyse. Default: 'gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff'.", default='gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff')
 parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. No '.' (dots) allowed. Default: 'geneexp prom splic cds iso'.", default='geneexp prom splic cds iso')
 parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-labeled significantly changed genes", action="store_true")
-parser.add_argument("--TSV", help="For p values > = 1 write tables as tab separated values", action="store_strue")
+parser.add_argument("--TSV", help="For p values > = 1 write tables as tab separated values", action="store_true")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
 parser.add_argument("--mart", help="Your mart of choice. Default='ensembl'", default='ensembl')
@@ -478,12 +478,12 @@ for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
         if sig >= 1:
             if args.TSV:
-		print "For "+str(label_choice)+" files will be saved as tsv"
+		print "For "+str(label)+" files will be saved as tsv"
             else:
                 writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
 
 	else:
-        writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
+            writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
         print "\nWritting table "+label+".xlsx"
         sys.stdout.flush()
     for imp, outshort in zip(in_files, out_labels):
@@ -588,10 +588,11 @@ for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
         if sig >= 1:
             if args.TSV:
-                print "For "+str(label_choice)+" files were saved as tsv" 
+                print "For "+str(label)+" files were saved as tsv" 
             else:
 	        writer.save()
-        writer.save()
+        else:
+            writer.save()
 
 if args.DAVID:
     DAVID_tmp_files=os.listdir(python_output)
