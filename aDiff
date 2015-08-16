@@ -28,6 +28,7 @@ parser.add_argument("--outputBiotypes", help="Outputs/attributes for your biotyp
 parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Default='ensembl_gene_id go_id name_1006'. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='ensembl_gene_id go_id name_1006')
 parser.add_argument("--listKEGGorganisms", help="List KEGG organisms.", action="store_true")
 parser.add_argument("--KEGGorg", help="KEGG organism. Default='cel'.", default='cel')
+parser.add_argument("--findKEGGdb", help="KEGG has DB identifier for each linked DB. Use this function to find the label of your DB, eg: 'ensembl-hsa', 'FlyBase'", action="store_true")
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list. Default: 'WORMBASE_GENE_ID'", default='WORMBASE_GENE_ID')
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list. Default: 'GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE'", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
@@ -38,7 +39,7 @@ if args.description:
 It generates 1 file for all results, 1 file for p<0.05, and 1 file/input table for q<0.05. \nFor significant values (i.e. q<0.05) it also generates \
 tables containg all pair-wise comparisons in different sheets as well as gene ontology enrichment files for biological processes (BP), \
 cellular component (CC), and molecular function (MF).\n \nRequired python packages:\na) pip install --user pandas==0.15.2 \nb) pip \
-install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install --user suds==0.4 \ne) pip install --user openpyxl==2.1.4 \nf) pip install --user bioservices \n \nRequired R packages: \nlibrary('biomaRt')\
+install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install --user suds==0.4 \ne) pip install --user openpyxl==2.1.4 \n \nRequired R packages: \nlibrary('biomaRt')\
  \n \nRequired arguments: \n-i, -o, -G, -C \n \nExample: \nannotate_cuffdiff_output.py -D -u John.Doe@age.mpg.de -i /path/to/cuffdiff_output_folder \
 -G /path/to/original.gtf -C /path/to/merged_and_compared.gtf -o /path/to/python_output_folder\
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
@@ -48,10 +49,10 @@ import pandas as pd
 import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
-from bioservices.kegg import KEGG
 import time
 from datetime import datetime
 import shutil
+from urllib import urlopen
 
 if args.listMarts:
     biomaRt = importr("biomaRt")
@@ -79,9 +80,21 @@ if args.listAttributes:
     sys.exit(0)
 
 if args.listKEGGorganisms:
-    k = KEGG()
-    print k.list("organism")
+    list_KEGG_organisms()
     sys.exit(0)
+
+if args.findKEGGdb:
+    print "This option requires --originalGTF"
+    sys.stdout.flush()
+    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None, dtype=str)
+    print "GTF imported"
+    sys.stdout.flush()
+    gtf = gtf.astype(str)
+    gene_id = retrieve_GTF_field('gene_id',gtf)
+    gene_id = gene_id['gene_id'].tolist()
+    find_KEGG_ensemblDB(args.KEGGorg,gene_id)
+    sys.exit(0)
+
 
 ################### paths to files #########################
 diff_out = os.path.realpath(args.inputFolder)
@@ -159,6 +172,105 @@ def retrieve_GTF_field(field,gtf):
     field = pd.DataFrame(field[0].str.split('"').tolist())[1]
     field = pd.DataFrame(field)
     return field
+
+def list_KEGG_organisms():
+    organisms=urlopen("http://rest.kegg.jp/list/organism").read()
+    organisms=organisms.split("\n")
+    for o in organisms:
+        o=o.split("\t")
+        print str(o[1]), str(o[2])
+        sys.stdout.flush()
+
+def find_KEGG_ensemblDB(organism,ens_ids):
+    all_genes=urlopen("http://rest.kegg.jp/list/"+organism).read()
+    all_genes=all_genes.split("\n")
+    dbs=[]
+    while len(dbs) == 0:
+        for g in all_genes:
+            if len(dbs) == 0:
+                kid = g.split("\t")[0]
+                gene=urlopen("http://rest.kegg.jp/get/"+kid).read()
+                DBLINKS=gene.split("\n")
+                DBLINKS=[ s for s in DBLINKS if ":" in s ]
+                for d in DBLINKS:
+                    test=d.split(" ")
+                    test=test[len(test)-1]
+                    if test in ens_ids:
+                        DBLINK=[ s for s in DBLINKS if test in s ]
+                        DBLINK=DBLINK[0].split(":")
+                        DBLINK=DBLINK[len(DBLINK)-2]
+                        dbs.append(DBLINK)
+            else:
+                break
+    ens_db=dbs[0].split(" ")
+    ens_db=ens_db[len(ens_db)-1]
+    test_db=urlopen("http://rest.genome.jp/link/"+ens_db+"/"+organism).read()
+    test_db=test_db.split("\n")
+    if len(test_db) == 1:
+        print "For "+organism+" the following db was found: "+ens_db
+        print "This database does not seem to be valid KEGG-linked database identifier"
+        print "For \n'hsa' use 'ensembl-hsa'\n'mmu' use 'ensembl-mmu'\n'cel' use 'EnsemblGenomes-Gn'\n'dme' use 'FlyBase'" 
+        sys.stdout.flush()
+    else:
+        print "For "+organism+" the following db was found: "+ens_db
+        sys.stdout.flush()
+    return ens_db
+
+def ensembl_to_kegg(organism,ens_db):
+    print "KEGG API: http://rest.genome.jp/link/"+ens_db+"/"+organism
+    sys.stdout.flush()
+    kegg_ens=urlopen("http://rest.genome.jp/link/"+ens_db+"/"+organism).read()
+    kegg_ens=kegg_ens.split("\n")
+    final=[]
+    for i in kegg_ens:
+        final.append(i.split("\t"))
+    df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+    ens_id=pd.DataFrame(df[1].str.split(":").tolist())[1]
+    df=pd.concat([df,ens_id],axis=1)
+    df.columns=['KEGGid','ensDB','ENSid']
+    df=df[['KEGGid','ENSid']]
+    return df
+    
+def KEGG_paths(organism):
+    print "KEGG API: http://rest.kegg.jp/list/pathway/"+organism
+    sys.stdout.flush()
+    kegg_paths=urlopen("http://rest.kegg.jp/list/pathway/"+organism).read()
+    kegg_paths=kegg_paths.split("\n")
+    final=[]
+    for k in kegg_paths:
+        final.append(k.split("\t"))
+    df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+    df.columns=['pathID','pathName']
+    print "Collecting genes for pathways"
+    sys.stdout.flush()
+    df_pg=pd.DataFrame()
+    for i in df['pathID'].tolist():
+        print i
+        sys.stdout.flush()
+        path_genes=urlopen("http://rest.kegg.jp/link/genes/"+i).read()
+        path_genes=path_genes.split("\n")
+        final=[]
+        for k in path_genes:
+            final.append(k.split("\t"))
+        df_tmp=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+        df_tmp.columns=['pathID','KEGGid']
+        df_pg=pd.concat([df_pg,df_tmp])
+    df=pd.merge(df,df_pg,on=["pathID"], how="outer")
+    KEGGids=list(set(df['KEGGid'].tolist()))
+    print "Merging final table"
+    sys.stdout.flush()
+    df_final=pd.DataFrame()
+    for k in KEGGids:
+        print k
+        sys.stdout.flush()
+        df_tmp=df[df['KEGGid']==k]
+        pathIDs=", ".join(df_tmp['pathID'].tolist())
+        pathName=", ".join(df_tmp['pathName'].tolist())
+        d={'KEGGid':k,'pathIDs':pathIDs,'pathName':pathName}
+        df_tmp=pd.DataFrame(d,index=[0])
+        df_final=pd.concat([df_final,df_tmp])
+    df_final=df_final.dropna()
+    return df_final
 
 def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
     #import ssl
