@@ -54,115 +54,6 @@ from datetime import datetime
 import shutil
 from urllib import urlopen
 
-if args.listMarts:
-    biomaRt = importr("biomaRt")
-    print(biomaRt.listMarts())
-    sys.exit(0)
-
-if args.listDatasets:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    print(biomaRt.listDatasets(ensemblMart))
-    sys.exit(0)
-
-if args.listFilters:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    print(biomaRt.listFilters(ensembl))
-    sys.exit(0)
-
-if args.listAttributes:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    print(biomaRt.listAttributes(ensembl))
-    sys.exit(0)
-
-if args.listKEGGorganisms:
-    list_KEGG_organisms()
-    sys.exit(0)
-
-if args.findKEGGdb:
-    print "This option requires --originalGTF"
-    sys.stdout.flush()
-    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None, dtype=str)
-    print "GTF imported"
-    sys.stdout.flush()
-    gtf = gtf.astype(str)
-    gene_id = retrieve_GTF_field('gene_id',gtf)
-    gene_id = gene_id['gene_id'].tolist()
-    find_KEGG_ensemblDB(args.KEGGorg,gene_id)
-    sys.exit(0)
-
-
-################### paths to files #########################
-diff_out = os.path.realpath(args.inputFolder)
-original_gtf = os.path.realpath(args.originalGTF)
-merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
-python_output = args.outputFolder
-genomes_folder=original_gtf.split('/')
-genomes_folder=genomes_folder[0:len(genomes_folder)-1]
-genomes_folder="/".join(genomes_folder)
-
-if not os.path.exists(python_output):
-    os.makedirs(python_output)
-python_output=os.path.realpath(python_output)
-
-print "\nInput folder: "+diff_out
-sys.stdout.flush()
-print "Output folder: "+python_output
-sys.stdout.flush()
-print "Original GTF: "+original_gtf
-sys.stdout.flush()
-print "Cuffcompare curated GTF: "+merged_fixed_gtf
-sys.stdout.flush()
-print "Files being analysed: "+args.inputFiles
-sys.stdout.flush()
-print "Short output labels: "+args.shortOutputName
-sys.stdout.flush()
-
-if args.sigOnly:
-    print "\nReporting only significantly changed genes"
-    sig_choice = ['yes']
-    label_choice = ['diff_sig']
-else:
-    sig_choice = [0.05, 2, 'yes']
-    label_choice = ['diff_p.05','diff_all','diff_sig']
-
-if args.DAVID:
-    print "\nPerforming DAVID GO enrichment analysis"
-    print "\nYour DAVID user ID: "+args.DAVIDuser
-else:
-    print "\nUse -D if you want to perform DAVID GO enrichment analysis"
-
-sys.stdout.flush()
-
-in_files=args.inputFiles
-in_files=in_files.split()
-
-out_labels=args.shortOutputName
-out_labels=out_labels.split()
-
-out_biot=args.outputBiotypes
-out_biot=out_biot.split()
-
-out_go=args.outputGoterms
-out_go=out_go.split()
-
-############### Set Biomart resources ######################
-dataset = args.dataset
-data_filter = args.filter # filter for gene_id in GTF file, 'link_ensembl_gene_id'
-data_output_biotypes = out_biot # order needs to be kept i.e. id, biotype
-data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
-############################################################
-
-############### Check DAVID's ID for your set ######################
-# http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
-DAVID_id=args.DAVIDid
-####################################################################
-
-
 ############### FUNCTIONS ############
 
 def retrieve_GTF_field(field,gtf):
@@ -387,6 +278,115 @@ def DAVID_get(cat, filtered_table, all_genes_table):
     os.remove('background_tmp.txt')
 
     return enrichN
+
+
+if args.listMarts:
+    biomaRt = importr("biomaRt")
+    print(biomaRt.listMarts())
+    sys.exit(0)
+
+if args.listDatasets:
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    print(biomaRt.listDatasets(ensemblMart))
+    sys.exit(0)
+
+if args.listFilters:
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    print(biomaRt.listFilters(ensembl))
+    sys.exit(0)
+
+if args.listAttributes:
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    print(biomaRt.listAttributes(ensembl))
+    sys.exit(0)
+
+if args.listKEGGorganisms:
+    list_KEGG_organisms()
+    sys.exit(0)
+
+if args.findKEGGdb:
+    print "This option requires --originalGTF"
+    sys.stdout.flush()
+    gtf = pd.read_table(os.path.realpath(args.originalGTF), sep='\t', skiprows=6, header=None, dtype=str)
+    print "GTF imported"
+    sys.stdout.flush()
+    gtf = gtf.astype(str)
+    gene_id = retrieve_GTF_field('gene_id',gtf)
+    gene_id = gene_id['gene_id'].tolist()
+    find_KEGG_ensemblDB(args.KEGGorg,gene_id)
+    sys.exit(0)
+
+
+################### paths to files #########################
+diff_out = os.path.realpath(args.inputFolder)
+original_gtf = os.path.realpath(args.originalGTF)
+merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
+python_output = args.outputFolder
+genomes_folder=original_gtf.split('/')
+genomes_folder=genomes_folder[0:len(genomes_folder)-1]
+genomes_folder="/".join(genomes_folder)
+
+if not os.path.exists(python_output):
+    os.makedirs(python_output)
+python_output=os.path.realpath(python_output)
+
+print "\nInput folder: "+diff_out
+sys.stdout.flush()
+print "Output folder: "+python_output
+sys.stdout.flush()
+print "Original GTF: "+original_gtf
+sys.stdout.flush()
+print "Cuffcompare curated GTF: "+merged_fixed_gtf
+sys.stdout.flush()
+print "Files being analysed: "+args.inputFiles
+sys.stdout.flush()
+print "Short output labels: "+args.shortOutputName
+sys.stdout.flush()
+
+if args.sigOnly:
+    print "\nReporting only significantly changed genes"
+    sig_choice = ['yes']
+    label_choice = ['diff_sig']
+else:
+    sig_choice = [0.05, 2, 'yes']
+    label_choice = ['diff_p.05','diff_all','diff_sig']
+
+if args.DAVID:
+    print "\nPerforming DAVID GO enrichment analysis"
+    print "\nYour DAVID user ID: "+args.DAVIDuser
+else:
+    print "\nUse -D if you want to perform DAVID GO enrichment analysis"
+
+sys.stdout.flush()
+
+in_files=args.inputFiles
+in_files=in_files.split()
+
+out_labels=args.shortOutputName
+out_labels=out_labels.split()
+
+out_biot=args.outputBiotypes
+out_biot=out_biot.split()
+
+out_go=args.outputGoterms
+out_go=out_go.split()
+
+############### Set Biomart resources ######################
+dataset = args.dataset
+data_filter = args.filter # filter for gene_id in GTF file, 'link_ensembl_gene_id'
+data_output_biotypes = out_biot # order needs to be kept i.e. id, biotype
+data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
+############################################################
+
+############### Check DAVID's ID for your set ######################
+# http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
+DAVID_id=args.DAVIDid
+####################################################################
 
 ###################### START #####################
 
