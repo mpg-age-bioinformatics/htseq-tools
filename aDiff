@@ -28,7 +28,8 @@ parser.add_argument("--outputBiotypes", help="Outputs/attributes for your biotyp
 parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Default='ensembl_gene_id go_id name_1006'. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='ensembl_gene_id go_id name_1006')
 parser.add_argument("--listKEGGorganisms", help="List KEGG organisms.", action="store_true")
 parser.add_argument("--KEGGorg", help="KEGG organism. Default='cel'.", default='cel')
-parser.add_argument("--findKEGGdb", help="KEGG has DB identifier for each linked DB. Use this function to find the label of your DB, eg: 'ensembl-hsa', 'FlyBase'", action="store_true")
+parser.add_argument("--findKEGGdb", help="KEGG has DB identifier for each linked DB. Use this function to find the label of your DB, eg: 'ensembl-hsa', 'FlyBase'. This option requires --originalGTF and --KEGGorg", action="store_true")
+parser.add_argument("--KEGGdb", help="KEGG database linked to your ensembl organism. Default='EnsemblGenomes-Gn' (for Cel)", default='EnsemblGenomes-Gn')
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list. Default: 'WORMBASE_GENE_ID'", default='WORMBASE_GENE_ID')
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list. Default: 'GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE'", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
@@ -515,7 +516,7 @@ else:
     del name_id, ontology, genes, ontology_gene, ontology_gene_go, ontology_gene_go_number, ontology_gene_go_name, final
 
 # generate KEGG table
-'''
+
 if os.path.isfile(genomes_folder+'/KEGG.txt'):
     print "\nCopying already existing KEGG.txt file from genomes folder: "+str(genomes_folder)+"."
     sys.stdout.flush()
@@ -528,54 +529,16 @@ elif os.path.isfile(python_output+'/KEGG.txt'):
 else:
     print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
     sys.stdout.flush()
+    kegg_ens=ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
+    paths=KEGG_paths(args.KEGGorg)
+    df=pd.merge(kegg_en,paths,on=['KEGGid'],how='outer')    
+    df=df[['ENSid','KEGGid','pathIDs','pathName']]
+    df.columns=['g_id','KEGGid','pathIDs','pathName']
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-    genes=name_id['g_name'].tolist()
-    dfK=pd.DataFrame()
-    for g,i in zip(genes,range(len(genes))):
-        sys.stdout.write("\n%s\t%s%s done: \t%s\t" %(str(datetime.now())[:16],str ( round ((float(i+1)/float(len(genes))*100), 2 ) ),"%",g)  ) #\r      
-        sys.stdout.flush()  
-        tmp=name_id[name_id['g_name']==g]
-        g_id=tmp["g_id"].tolist()[0]
-	k = KEGG()
-	f = k.find(args.KEGGorg, g)
-	if f != "\n":
-	    f = f.split("\n")
-	    founds=[]	
-	    for i in f:
-	       	found=i.split("\t")[0]    
-	       	if found != "":
-		    Eid=k.get(found)
-                    if "Ensembl: " in Eid:
-		        Eid=Eid.split("Ensembl: ")[1]
-		        Eid=Eid.split("\n")[0]
-		        if Eid == g_id:
-			    founds.append(found)
-            if len(founds) > 0:
-		res=[]
-	        for i in founds:
-		    i = i.split(":")[1]
-		    r = k.get_pathway_by_gene(i, args.KEGGorg)
-		    if r != "\n":
-		        r = pd.DataFrame(r, index=[0])
-		        r = r.transpose()
-		        r = r[0].tolist()
-			r = ", ".join(r)
-		    else:
-			r="no pathway found for "+str(i)
-		    res.append(r)
-	        res="; ".join(res)
-            else:
-                res="no matching Ensembl ID in KEGG; no pathway found"	
-		founds=['no matching Ensembl ID in KEGG']
-	else:
-	    res="Gene not found in KEGG; no pathway found"
-	    founds=['no matching Ensembl ID in KEGG']
+    df=pd.merge(name_id,df,on=['g_id'],how='left')
+    df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
+    del kegg_ens,paths,df,name_id
 
-	tmp["KEGG_id"]="; ".join(founds)
-        tmp["KEGG_pathway"]=res
-	dfK=pd.concat([dfK,tmp])
-    dfK.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
-'''
 
 # create excel report tables
 print "\nCreating excel report tables"
@@ -583,8 +546,8 @@ sys.stdout.flush()
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-#KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_id','KEGG_id','KEGG_pathway'])
-#KEGG.columns=['identifier','KEGG_id','KEGG_pathway']
+KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_name','KEGGid','pathIDs','pathName'])
+KEGG.columns=['identifier','KEGG_ids','KEGG_pathIDS','KEGG_pathNames' ]
 
 for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
@@ -624,7 +587,7 @@ for sig, label in zip(sig_choice,label_choice):
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
             df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
-#            df = pd.merge(df,KEGG, how='left', on='identifier') 
+            df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
