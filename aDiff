@@ -153,8 +153,6 @@ def KEGG_paths(organism):
     sys.stdout.flush()
     df_final=pd.DataFrame()
     for k in KEGGids:
-        print k
-        sys.stdout.flush()
         df_tmp=df[df['KEGGid']==k]
         pathIDs=", ".join(df_tmp['pathID'].tolist())
         pathName=", ".join(df_tmp['pathName'].tolist())
@@ -531,7 +529,7 @@ else:
     sys.stdout.flush()
     kegg_ens=ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
     paths=KEGG_paths(args.KEGGorg)
-    df=pd.merge(kegg_en,paths,on=['KEGGid'],how='outer')    
+    df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')    
     df=df[['ENSid','KEGGid','pathIDs','pathName']]
     df.columns=['g_id','KEGGid','pathIDs','pathName']
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
