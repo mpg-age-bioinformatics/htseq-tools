@@ -10,11 +10,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-D", "--DAVID", help="Use this flag to perform DAVID GO enrichment analysis", action="store_true")
 parser.add_argument("-i", "--inputFolder", help="Cuffdiff output folder")
 parser.add_argument("-o", "--outputFolder", help="Output folder")
-parser.add_argument("-G", "--originalGTF", help="Origianl/downloaded GTF")
+parser.add_argument("-G", "--originalGTF", help="Original/downloaded GTF")
 parser.add_argument("-C", "--cuffcompareGTF", help="Merged cuffcompared GTF")
 parser.add_argument("-f", "--inputFiles", help="Implies -s. Use this option to select which *.diff files you wish to analyse. Default: 'gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff'.", default='gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff')
 parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. No '.' (dots) allowed. Default: 'geneexp prom splic cds iso'.", default='geneexp prom splic cds iso')
 parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-labeled significantly changed genes", action="store_true")
+parser.add_argument("--TSV", help="For p values > = 1 write tables as tab separated values", action="store_true")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
 parser.add_argument("--mart", help="Your mart of choice. Default='ensembl'", default='ensembl')
@@ -25,6 +26,10 @@ parser.add_argument("--filter", help="Filter to use to identify your genes. Defa
 parser.add_argument("--listAttributes", help="List available attributes for your dataset.", action="store_true")
 parser.add_argument("--outputBiotypes", help="Outputs/attributes for your biotypes data. Default='ensembl_gene_id gene_biotype'. Order has to be kept, ie. first IDs then biotype.", default='ensembl_gene_id gene_biotype')
 parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Default='ensembl_gene_id go_id name_1006'. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='ensembl_gene_id go_id name_1006')
+parser.add_argument("--listKEGGorganisms", help="List KEGG organisms.", action="store_true")
+parser.add_argument("--KEGGorg", help="KEGG organism. Default='cel'.", default='cel')
+parser.add_argument("--findKEGGdb", help="KEGG has DB identifier for each linked DB. Use this function to find the label of your DB, eg: 'ensembl-hsa', 'FlyBase'. This option requires --originalGTF and --KEGGorg", action="store_true")
+parser.add_argument("--KEGGdb", help="KEGG database linked to your ensembl organism. Default='EnsemblGenomes-Gn' (for Cel)", default='EnsemblGenomes-Gn')
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list. Default: 'WORMBASE_GENE_ID'", default='WORMBASE_GENE_ID')
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list. Default: 'GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE'", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
@@ -41,234 +46,121 @@ install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
     sys.exit(0)
 
-
 import pandas as pd
 import numpy as np
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
+import time
+from datetime import datetime
+import shutil
+from urllib import urlopen
 
+############### FUNCTIONS ############
 
-if args.listMarts:
-    biomaRt = importr("biomaRt")
-    print(biomaRt.listMarts())
-    sys.exit(0)
+def retrieve_GTF_field(field,gtf):
+    field = pd.DataFrame(gtf[8].str.split(field).tolist())[1]
+    field = field.astype(str)
+    field = pd.DataFrame(field.str.split(';',1).tolist())
+    field = pd.DataFrame(field[0].str.split('"').tolist())[1]
+    field = pd.DataFrame(field)
+    return field
 
-if args.listDatasets:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    print(biomaRt.listDatasets(ensemblMart))
-    sys.exit(0)
+def list_KEGG_organisms():
+    organisms=urlopen("http://rest.kegg.jp/list/organism").read()
+    organisms=organisms.split("\n")
+    for o in organisms:
+        o=o.split("\t")
+        print str(o[1]), str(o[2])
+        sys.stdout.flush()
 
-if args.listFilters:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    print(biomaRt.listFilters(ensembl))
-    sys.exit(0)
+def find_KEGG_ensemblDB(organism,ens_ids):
+    all_genes=urlopen("http://rest.kegg.jp/list/"+organism).read()
+    all_genes=all_genes.split("\n")
+    dbs=[]
+    while len(dbs) == 0:
+        for g in all_genes:
+            if len(dbs) == 0:
+                kid = g.split("\t")[0]
+                gene=urlopen("http://rest.kegg.jp/get/"+kid).read()
+                DBLINKS=gene.split("\n")
+                DBLINKS=[ s for s in DBLINKS if ":" in s ]
+                for d in DBLINKS:
+                    test=d.split(" ")
+                    test=test[len(test)-1]
+                    if test in ens_ids:
+                        DBLINK=[ s for s in DBLINKS if test in s ]
+                        DBLINK=DBLINK[0].split(":")
+                        DBLINK=DBLINK[len(DBLINK)-2]
+                        dbs.append(DBLINK)
+            else:
+                break
+    ens_db=dbs[0].split(" ")
+    ens_db=ens_db[len(ens_db)-1]
+    test_db=urlopen("http://rest.genome.jp/link/"+ens_db+"/"+organism).read()
+    test_db=test_db.split("\n")
+    if len(test_db) == 1:
+        print "For "+organism+" the following db was found: "+ens_db
+        print "This database does not seem to be valid KEGG-linked database identifier"
+        print "For \n'hsa' use 'ensembl-hsa'\n'mmu' use 'ensembl-mmu'\n'cel' use 'EnsemblGenomes-Gn'\n'dme' use 'FlyBase'" 
+        sys.stdout.flush()
+    else:
+        print "For "+organism+" the following db was found: "+ens_db
+        sys.stdout.flush()
+    return ens_db
 
-if args.listAttributes:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    print(biomaRt.listAttributes(ensembl))
-    sys.exit(0)
-
-################### paths to files #########################
-diff_out = os.path.realpath(args.inputFolder)
-original_gtf = os.path.realpath(args.originalGTF)
-merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
-python_output = args.outputFolder
-
-if not os.path.exists(python_output):
-    os.makedirs(python_output)
-python_output=os.path.realpath(python_output)
-
-print "\nInput folder: "+diff_out
-sys.stdout.flush()
-print "Output folder: "+python_output
-sys.stdout.flush()
-print "Original GTF: "+original_gtf
-sys.stdout.flush()
-print "Cuffcompare curated GTF: "+merged_fixed_gtf
-sys.stdout.flush()
-print "Files being analysed: "+args.inputFiles
-sys.stdout.flush()
-print "Short output labels: "+args.shortOutputName
-sys.stdout.flush()
-
-if args.sigOnly:
-    print "\nReporting only significantly changed genes"
-    sig_choice = ['yes']
-    label_choice = ['diff_sig']
-else:
-    sig_choice = [0.05, 2, 'yes']
-    label_choice = ['diff_p.05','diff_all','diff_sig']
-
-if args.DAVID:
-    print "\nPerforming DAVID GO enrichment analysis"
-    print "\nYour DAVID user ID: "+args.DAVIDuser
-else:
-    print "\nUse -D if you want to perform DAVID GO enrichment analysis"
-
-sys.stdout.flush()
-
-in_files=args.inputFiles
-in_files=in_files.split()
-
-out_labels=args.shortOutputName
-out_labels=out_labels.split()
-
-out_biot=args.outputBiotypes
-out_biot=out_biot.split()
-
-out_go=args.outputGoterms
-out_go=out_go.split()
-
-############### Check available BioMart data ######################
-#biomaRt = importr("biomaRt") # do not quote
-#print(biomaRt.listMarts())
-#ensemblMart=biomaRt.useMart(args.mart) # do not quote
-#print(biomaRt.listDatasets(ensemblMart))
-#ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart) # do not quote
-#print(biomaRt.listFilters(ensembl))
-#print(biomaRt.listAttributes(ensembl))
-###################################################################
-
-############### Set Biomart resources ######################
-dataset = args.dataset
-data_filter = args.filter # filter for gene_id in GTF file, 'link_ensembl_gene_id'
-data_output_biotypes = out_biot # order needs to be kept i.e. id, biotype
-data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
-############################################################
-
-############### Check DAVID's ID for your set ######################
-# http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
-DAVID_id=args.DAVIDid
-####################################################################
-
-os.chdir(diff_out)
-
-########## Get list of gene names and respective ids present in the data set
-
-if os.path.isfile(python_output+'/genes_table.txt'):
-    print "\nUsing already existing list of gene names and ids"
+def ensembl_to_kegg(organism,ens_db):
+    print "KEGG API: http://rest.genome.jp/link/"+ens_db+"/"+organism
     sys.stdout.flush()
-    genes=pd.read_table(python_output+'/genes_table.txt')
-    genes = genes['g_id'].tolist()
-
-else:
-    print "\nGetting list of gene names and respective ids present in the data set"
+    kegg_ens=urlopen("http://rest.genome.jp/link/"+ens_db+"/"+organism).read()
+    kegg_ens=kegg_ens.split("\n")
+    final=[]
+    for i in kegg_ens:
+        final.append(i.split("\t"))
+    df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+    ens_id=pd.DataFrame(df[1].str.split(":").tolist())[1]
+    df=pd.concat([df,ens_id],axis=1)
+    df.columns=['KEGGid','ensDB','ENSid']
+    df=df[['KEGGid','ENSid']]
+    return df
+    
+def KEGG_paths(organism):
+    print "KEGG API: http://rest.kegg.jp/list/pathway/"+organism
     sys.stdout.flush()
-    genes = pd.DataFrame()
-    for file in ['gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff', 'isoform_exp.diff']:
-        df = pd.read_table(file)
-        df = df[['gene']]
-        genes = pd.concat([genes,df]).drop_duplicates()
-    genes = genes.astype(str)
-    genes = pd.DataFrame(genes.gene.str.split(',').tolist())[0]
-    genes = genes.drop_duplicates()
-    genes = genes.tolist()
-    print "Imported list of differentially regulated genes"
+    kegg_paths=urlopen("http://rest.kegg.jp/list/pathway/"+organism).read()
+    kegg_paths=kegg_paths.split("\n")
+    final=[]
+    for k in kegg_paths:
+        final.append(k.split("\t"))
+    df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+    df.columns=['pathID','pathName']
+    print "Collecting genes for pathways"
     sys.stdout.flush()
-
-    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None, dtype=str)
-    print "GTF imported"
+    df_pg=pd.DataFrame()
+    for i in df['pathID'].tolist():
+        print i
+        sys.stdout.flush()
+        path_genes=urlopen("http://rest.kegg.jp/link/genes/"+i).read()
+        path_genes=path_genes.split("\n")
+        final=[]
+        for k in path_genes:
+            final.append(k.split("\t"))
+        df_tmp=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+        df_tmp.columns=['pathID','KEGGid']
+        df_pg=pd.concat([df_pg,df_tmp])
+    df=pd.merge(df,df_pg,on=["pathID"], how="outer")
+    KEGGids=list(set(df['KEGGid'].tolist()))
+    print "Merging final table"
     sys.stdout.flush()
-    gtf = gtf.astype(str)
-
-    gene_name = pd.DataFrame(gtf[8].str.split('gene_name').tolist())[1]
-    gene_name = gene_name.astype(str)
-    gene_name = pd.DataFrame(gene_name.str.split(';',1).tolist())
-    gene_name = pd.DataFrame(gene_name[0].str.split('"').tolist())[1]
-    gene_name = pd.DataFrame(gene_name)
-    print "Read gene names from GTF"
-    sys.stdout.flush()
-
-    gene_id = pd.DataFrame(gtf[8].str.split('gene_id').tolist())[1]
-    gene_id = gene_id.astype(str)
-    gene_id = pd.DataFrame(gene_id.str.split(';',1).tolist())
-    gene_id = pd.DataFrame(gene_id[0].str.split('"').tolist())[1]
-    gene_id = pd.DataFrame(gene_id)
-    print "Read gene ids from GTF"
-    sys.stdout.flush()
-
-    name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
-    name_id.columns = ['g_name','g_id']
-    name_id = name_id[name_id['g_name'].isin(genes)]
-    print "Generated Names/IDs table"
-    sys.stdout.flush()
-
-    genes = name_id['g_id'].tolist()
-
-    name_id.to_csv(python_output+'/genes_table.txt', sep="\t",index=False)
-
-    del gtf, gene_name, gene_id, name_id
-
-
-# Use R and BioMart to retrieve biotypes and gene ontoloty information
-
-if os.path.isfile(python_output+'/biotypes_go_raw.txt'):
-    print "\nUsing already existing biotypes_go_raw.txt file"
-    sys.stdout.flush()
-else:
-    print "\nRetrieving biotypes and gene ontoloy information"
-    sys.stdout.flush()
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    biotypes=biomaRt.getBM(attributes=data_output_biotypes, filters=data_filter, values=genes, mart=ensembl)
-    goterms=biomaRt.getBM(attributes=data_output_goterms, filters=data_filter, values=genes, mart=ensembl)
-    bio_go=robjects.r.merge(biotypes, goterms,by=1, all='TRUE')
-    bio_go.to_csvfile(python_output+'/biotypes_go_raw.txt', quote=False, sep='\t', row_names=False)
-
-
-# generate biotypes and go terms table using R/biomart output table.
-
-if os.path.isfile(python_output+'/biotypes_go.txt'):
-    print "\nUsing already existing biotypes_go.txt file"
-    sys.stdout.flush()
-else:
-    print "\nGenerating final biotypes and GO terms table"
-    sys.stdout.flush()
-    name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-    ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
-    ontology.columns = ['g_id','gene_biotype','GO_id','GO_term']
-    ontology = pd.merge(name_id, ontology, how='outer', on='g_id')
-    ontology = ontology[['g_name','gene_biotype','GO_id','GO_term']]
-    ontology.columns = ['gene_name','gene_biotype','GO_id','GO_term']
-
-    final = pd.DataFrame(columns = ['gene_name','gene_biotype','GO_id','GO_term'])
-
-    genes = ontology[['gene_name']]
-    genes = genes.drop_duplicates()
-    for gene in list(genes.gene_name):
-        ontology_gene = ontology[ontology['gene_name'] == gene]
-        ontology_gene_go = ontology_gene[['GO_id','GO_term']]
-        if len(ontology_gene_go.index) >= 1:
-            ontology_gene_go = ontology_gene_go.transpose()
-            ontology_gene_go.to_csv("tmp.txt", sep=";", header=False, index=False)
-            ontology_gene_go_number = pd.read_table("tmp.txt", sep ="\t", header=None, nrows = 1)
-            ontology_gene_go_name = pd.read_table("tmp.txt", sep ="\t", header=None, skiprows=1, nrows = 1)
-            ontology_gene_go = pd.concat([ontology_gene_go_number, ontology_gene_go_name], axis=1)
-            ontology_gene_go.columns = ['GO_id','GO_term']
-        else:
-            ontology_gene_go = pd.DataFrame(columns = ['GO_id','GO_term'])
-
-        ontology_gene = ontology_gene[['gene_name','gene_biotype']].drop_duplicates()
-        ontology_gene_go = ontology_gene_go.reset_index()
-        ontology_gene = ontology_gene.reset_index()
-        ontology_gene = pd.concat([ontology_gene, ontology_gene_go], axis = 1)
-        ontology_gene = ontology_gene[['gene_name','gene_biotype','GO_id','GO_term']]
-        final = pd.concat([final, ontology_gene])
-    os.remove("tmp.txt")
-    final.reset_index()
-    final=final[['gene_name','gene_biotype','GO_id','GO_term']]
-    final.to_csv(python_output+"/biotypes_go.txt", sep= "\t")
-
-    del name_id, ontology, genes, ontology_gene, ontology_gene_go, ontology_gene_go_number, ontology_gene_go_name, final
-
-
-##################### Functions required for getting analysis from DAVID
+    df_final=pd.DataFrame()
+    for k in KEGGids:
+        df_tmp=df[df['KEGGid']==k]
+        pathIDs=", ".join(df_tmp['pathID'].tolist())
+        pathName=", ".join(df_tmp['pathName'].tolist())
+        d={'KEGGid':k,'pathIDs':pathIDs,'pathName':pathName}
+        df_tmp=pd.DataFrame(d,index=[0])
+        df_final=pd.concat([df_final,df_tmp])
+    df_final=df_final.dropna()
+    return df_final
 
 def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
     #import ssl
@@ -387,17 +279,284 @@ def DAVID_get(cat, filtered_table, all_genes_table):
     return enrichN
 
 
+if args.listMarts:
+    biomaRt = importr("biomaRt")
+    print(biomaRt.listMarts())
+    sys.exit(0)
+
+if args.listDatasets:
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    print(biomaRt.listDatasets(ensemblMart))
+    sys.exit(0)
+
+if args.listFilters:
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    print(biomaRt.listFilters(ensembl))
+    sys.exit(0)
+
+if args.listAttributes:
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    print(biomaRt.listAttributes(ensembl))
+    sys.exit(0)
+
+if args.listKEGGorganisms:
+    list_KEGG_organisms()
+    sys.exit(0)
+
+if args.findKEGGdb:
+    print "This option requires --originalGTF"
+    sys.stdout.flush()
+    gtf = pd.read_table(os.path.realpath(args.originalGTF), sep='\t', skiprows=6, header=None, dtype=str)
+    print "GTF imported"
+    sys.stdout.flush()
+    gtf = gtf.astype(str)
+    gene_id = retrieve_GTF_field('gene_id',gtf)
+    gene_id = gene_id['gene_id'].tolist()
+    find_KEGG_ensemblDB(args.KEGGorg,gene_id)
+    sys.exit(0)
+
+
+################### paths to files #########################
+diff_out = os.path.realpath(args.inputFolder)
+original_gtf = os.path.realpath(args.originalGTF)
+merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
+python_output = args.outputFolder
+genomes_folder=original_gtf.split('/')
+genomes_folder=genomes_folder[0:len(genomes_folder)-1]
+genomes_folder="/".join(genomes_folder)
+
+if not os.path.exists(python_output):
+    os.makedirs(python_output)
+python_output=os.path.realpath(python_output)
+
+print "\nInput folder: "+diff_out
+sys.stdout.flush()
+print "Output folder: "+python_output
+sys.stdout.flush()
+print "Original GTF: "+original_gtf
+sys.stdout.flush()
+print "Cuffcompare curated GTF: "+merged_fixed_gtf
+sys.stdout.flush()
+print "Files being analysed: "+args.inputFiles
+sys.stdout.flush()
+print "Short output labels: "+args.shortOutputName
+sys.stdout.flush()
+
+if args.sigOnly:
+    print "\nReporting only significantly changed genes"
+    sig_choice = ['yes']
+    label_choice = ['diff_sig']
+else:
+    sig_choice = [0.05, 2, 'yes']
+    label_choice = ['diff_p.05','diff_all','diff_sig']
+
+if args.DAVID:
+    print "\nPerforming DAVID GO enrichment analysis"
+    print "\nYour DAVID user ID: "+args.DAVIDuser
+else:
+    print "\nUse -D if you want to perform DAVID GO enrichment analysis"
+
+sys.stdout.flush()
+
+in_files=args.inputFiles
+in_files=in_files.split()
+
+out_labels=args.shortOutputName
+out_labels=out_labels.split()
+
+out_biot=args.outputBiotypes
+out_biot=out_biot.split()
+
+out_go=args.outputGoterms
+out_go=out_go.split()
+
+############### Set Biomart resources ######################
+dataset = args.dataset
+data_filter = args.filter # filter for gene_id in GTF file, 'link_ensembl_gene_id'
+data_output_biotypes = out_biot # order needs to be kept i.e. id, biotype
+data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
+############################################################
+
+############### Check DAVID's ID for your set ######################
+# http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
+DAVID_id=args.DAVIDid
+####################################################################
+
+###################### START #####################
+
+os.chdir(diff_out)
+
+########## Get list of gene names and respective ids present in the data set
+
+if os.path.isfile(python_output+'/genes_table.txt'):
+    print "\nUsing already existing list of gene names and ids"
+    sys.stdout.flush()
+    genes=pd.read_table(python_output+'/genes_table.txt')
+    genes = genes['g_id'].tolist()
+
+else:
+    print "\nGetting list of gene names and respective ids present in the data set"
+    sys.stdout.flush()
+    genes = pd.DataFrame()
+    for file in ['gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff', 'isoform_exp.diff']:
+        df = pd.read_table(file)
+        df = df[['gene']]
+        genes = pd.concat([genes,df]).drop_duplicates()
+    genes = genes.astype(str)
+    genes = pd.DataFrame(genes.gene.str.split(',').tolist())[0]
+    genes = genes.drop_duplicates()
+    genes = genes.tolist()
+    print "Imported list of differentially regulated genes"
+    sys.stdout.flush()
+
+    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None, dtype=str)
+    print "GTF imported"
+    sys.stdout.flush()
+    gtf = gtf.astype(str)
+
+    gene_name = retrieve_GTF_field('gene_name',gtf)
+    print "Read gene names from GTF"
+    sys.stdout.flush()
+
+    gene_id = retrieve_GTF_field('gene_id',gtf)
+    print "Read gene ids from GTF"
+    sys.stdout.flush()
+
+    name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
+    name_id.columns = ['g_name','g_id']
+    name_id = name_id[name_id['g_name'].isin(genes)]
+    print "Generated Names/IDs table"
+    sys.stdout.flush()
+
+    genes = name_id['g_id'].tolist()
+
+    name_id.to_csv(python_output+'/genes_table.txt', sep="\t",index=False)
+
+    del gtf, gene_name, gene_id, name_id
+
+
+# Use R and BioMart to retrieve biotypes and gene ontoloty information
+
+if os.path.isfile(genomes_folder+'/biotypes_go_raw.txt'):
+    print "\nCopying already existing biotypes_go_raw.txt file from genomes folder: "+str(genomes_folder)+"."
+    sys.stdout.flush()
+    shutil.copy(genomes_folder+'/biotypes_go_raw.txt', python_output+'/biotypes_go_raw.txt')
+
+elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
+    print "\nUsing already existing biotypes_go_raw.txt file"
+    sys.stdout.flush()
+
+else:
+    print "\nRetrieving biotypes and gene ontoloy information"
+    sys.stdout.flush()
+    biomaRt = importr("biomaRt")
+    ensemblMart=biomaRt.useMart(args.mart)
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    biotypes=biomaRt.getBM(attributes=data_output_biotypes, filters=data_filter, values=genes, mart=ensembl)
+    goterms=biomaRt.getBM(attributes=data_output_goterms, filters=data_filter, values=genes, mart=ensembl)
+    bio_go=robjects.r.merge(biotypes, goterms,by=1, all='TRUE')
+    bio_go.to_csvfile(python_output+'/biotypes_go_raw.txt', quote=False, sep='\t', row_names=False)
+
+
+# generate biotypes and go terms table using R/biomart output table.
+
+if os.path.isfile(genomes_folder+'/biotypes_go.txt'):
+    print "\nCopying already existing biotypes_go.txt file from genomes folder: "+str(genomes_folder)+"."
+    sys.stdout.flush()
+    shutil.copy(genomes_folder+'/biotypes_go.txt', python_output+'/biotypes_go.txt')
+
+elif os.path.isfile(python_output+'/biotypes_go.txt'):
+    print "\nUsing already existing biotypes_go.txt file"
+    sys.stdout.flush()
+else:
+    print "\nGenerating final biotypes and GO terms table"
+    sys.stdout.flush()
+    name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
+    ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
+    ontology.columns = ['g_id','gene_biotype','GO_id','GO_term']
+    ontology = pd.merge(name_id, ontology, how='outer', on='g_id')
+    ontology = ontology[['g_name','gene_biotype','GO_id','GO_term']]
+    ontology.columns = ['gene_name','gene_biotype','GO_id','GO_term']
+
+    final = pd.DataFrame(columns = ['gene_name','gene_biotype','GO_id','GO_term'])
+
+    genes = ontology[['gene_name']]
+    genes = genes.drop_duplicates()
+    for gene in list(genes.gene_name):
+        ontology_gene = ontology[ontology['gene_name'] == gene]
+        ontology_gene_go = ontology_gene[['GO_id','GO_term']]
+        if len(ontology_gene_go.index) >= 1:
+            ontology_gene_go = ontology_gene_go.transpose()
+            ontology_gene_go.to_csv("tmp.txt", sep=";", header=False, index=False)
+            ontology_gene_go_number = pd.read_table("tmp.txt", sep ="\t", header=None, nrows = 1)
+            ontology_gene_go_name = pd.read_table("tmp.txt", sep ="\t", header=None, skiprows=1, nrows = 1)
+            ontology_gene_go = pd.concat([ontology_gene_go_number, ontology_gene_go_name], axis=1)
+            ontology_gene_go.columns = ['GO_id','GO_term']
+        else:
+            ontology_gene_go = pd.DataFrame(columns = ['GO_id','GO_term'])
+
+        ontology_gene = ontology_gene[['gene_name','gene_biotype']].drop_duplicates()
+        ontology_gene_go = ontology_gene_go.reset_index()
+        ontology_gene = ontology_gene.reset_index()
+        ontology_gene = pd.concat([ontology_gene, ontology_gene_go], axis = 1)
+        ontology_gene = ontology_gene[['gene_name','gene_biotype','GO_id','GO_term']]
+        final = pd.concat([final, ontology_gene])
+    os.remove("tmp.txt")
+    final.reset_index()
+    final=final[['gene_name','gene_biotype','GO_id','GO_term']]
+    final.to_csv(python_output+"/biotypes_go.txt", sep= "\t")
+
+    del name_id, ontology, genes, ontology_gene, ontology_gene_go, ontology_gene_go_number, ontology_gene_go_name, final
+
+# generate KEGG table
+
+if os.path.isfile(genomes_folder+'/KEGG.txt'):
+    print "\nCopying already existing KEGG.txt file from genomes folder: "+str(genomes_folder)+"."
+    sys.stdout.flush()
+    shutil.copy(genomes_folder+'/KEGG.txt', python_output+'/KEGG.txt')
+
+elif os.path.isfile(python_output+'/KEGG.txt'):
+    print "\nUsing already existing KEGG.txt file"
+    sys.stdout.flush()
+
+else:
+    print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
+    sys.stdout.flush()
+    kegg_ens=ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
+    paths=KEGG_paths(args.KEGGorg)
+    df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')    
+    df=df[['ENSid','KEGGid','pathIDs','pathName']]
+    df.columns=['g_id','KEGGid','pathIDs','pathName']
+    name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
+    df=pd.merge(name_id,df,on=['g_id'],how='left')
+    df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
+    del kegg_ens,paths,df,name_id
+
+
 # create excel report tables
 print "\nCreating excel report tables"
 sys.stdout.flush()
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
-
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
+KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_name','KEGGid','pathIDs','pathName'])
+KEGG.columns=['identifier','KEGG_ids','KEGG_pathIDS','KEGG_pathNames' ]
 
 for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
-        writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
+        if sig >= 1:
+            if args.TSV:
+		print "For "+str(label)+" files will be saved as tsv"
+            else:
+                writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
+
+	else:
+            writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
         print "\nWritting table "+label+".xlsx"
         sys.stdout.flush()
     for imp, outshort in zip(in_files, out_labels):
@@ -426,17 +585,12 @@ for sig, label in zip(sig_choice,label_choice):
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
             df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
+            df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
-                t_id = pd.DataFrame(gtf[8].str.split('transcript_id').tolist())[1]
-                t_id = pd.DataFrame(t_id.str.split(';',1).tolist())
-                t_id = pd.DataFrame(t_id[0].str.split('"').tolist())[1]
-
-                n_ref = pd.DataFrame(gtf[8].str.split('nearest_ref').tolist())[1]
-                n_ref = n_ref.astype(str)
-                n_ref = pd.DataFrame(n_ref.str.split(';',1).tolist())
-                n_ref = pd.DataFrame(n_ref[0].str.split('"').tolist())[1]
+                t_id = retrieve_GTF_field('transcript_id',gtf)    
+                n_ref = retrieve_GTF_field('nearest_ref',gtf)
 
                 id_ref = pd.concat([t_id, n_ref], axis=1).drop_duplicates()
                 id_ref.columns = ['transcript_id','nearest_ref']
@@ -445,8 +599,6 @@ for sig, label in zip(sig_choice,label_choice):
 
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
-
-
 
                 def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
                     if len(table_of_interest.index) >= 1:
@@ -464,21 +616,15 @@ for sig, label in zip(sig_choice,label_choice):
                 samples=samples.drop_duplicates()
                 samples=samples['samples'].tolist()
 
-                for sample1 in samples:
-                    for sample2 in samples:
-                        if sample1 != sample2:
-                            if os.path.exists(sample1+sample2):
-                                os.rmdir(sample1+sample2)
-                            elif os.path.exists(sample2+sample1):
-                                os.rmdir(sample2+sample1)
+                readyList=[]
 
                 for sample1 in samples:
                     for sample2 in samples:
                         if sample1 != sample2:
-                            if not os.path.exists(sample1+sample2):
-                                if not os.path.exists(sample2+sample1):
+                            if sample1+sample2 not in readyList :
+                                if sample2+sample1 not in readyList :
 
-                                    os.makedirs(sample1+sample2)
+                                    readyList.append(sample1+sample2)
                                     df_pair = df[df['sample_1'].isin([sample1,sample2])][df['sample_2'].isin([sample1,sample2])]
                                     if args.DAVID:
                                         print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
@@ -492,13 +638,6 @@ for sig, label in zip(sig_choice,label_choice):
 
                                     df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
 
-                for sample1 in samples:
-                    for sample2 in samples:
-                        if sample1 != sample2:
-                            if os.path.exists(sample1+sample2):
-                                os.rmdir(sample1+sample2)
-                            elif os.path.exists(sample2+sample1):
-                                os.rmdir(sample2+sample1)
 
             df.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
 
@@ -510,9 +649,23 @@ for sig, label in zip(sig_choice,label_choice):
                 writer.save()
                 
         if sig != 'yes':
-            df.to_excel(writer, outshort+'_'+'ALL', index=False)
+            if sig >= 1:
+                if args.TSV:
+                    df.to_csv(outshort+'_'+'ALL.tsv', index=False)
+                else:
+                    df.to_excel(writer, outshort+'_'+'ALL', index=False)
+
+            else:
+                df.to_excel(writer, outshort+'_'+'ALL', index=False)
+
     if sig != 'yes':
-        writer.save()
+        if sig >= 1:
+            if args.TSV:
+                print "For "+str(label)+" files were saved as tsv" 
+            else:
+	        writer.save()
+        else:
+            writer.save()
 
 if args.DAVID:
     DAVID_tmp_files=os.listdir(python_output)
