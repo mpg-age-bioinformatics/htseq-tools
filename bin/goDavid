@@ -407,6 +407,10 @@ for sig, label in zip(sig_choice,label_choice):
       df = df.reset_index()
       df['gene'] = df['gene'].astype(str)
       tmp = pd.DataFrame(df.gene.str.split(',',1).tolist())
+      print "    n = " + str(len(tmp))
+      if len(tmp) < 1:
+        print "    skipping empty file"
+        continue
       tmp = pd.DataFrame(tmp.ix[:,0])
       tmp.columns = ['identifier']
       df = pd.concat([df,tmp], axis=1)
