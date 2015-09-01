@@ -597,7 +597,7 @@ for sig, label in zip(sig_choice,label_choice):
             tmp = pd.DataFrame(df.gene.str.split(',',1).tolist())
             if len(tmp) < 1:
                 print "skipping empty file"
-                #continue
+                continue
             tmp = pd.DataFrame(tmp.ix[:,0])
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
