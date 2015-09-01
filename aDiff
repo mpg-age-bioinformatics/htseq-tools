@@ -133,18 +133,23 @@ def KEGG_paths(organism):
         final.append(k.split("\t"))
     df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
     df.columns=['pathID','pathName']
-    print "Collecting genes for pathways"
+    print "Collecting genes for " + str(len(df)) + " pathways"
     sys.stdout.flush()
     df_pg=pd.DataFrame()
     for i in df['pathID'].tolist():
-        print i
+        print i+" ",
         sys.stdout.flush()
         path_genes=urlopen("http://rest.kegg.jp/link/genes/"+i).read()
         path_genes=path_genes.split("\n")
         final=[]
         for k in path_genes:
             final.append(k.split("\t"))
-        df_tmp=pd.DataFrame(final[0:len(final)-1])[[0,1]]
+        final.pop()
+        if len(final[0]) is not 2:
+          print " skipped (no genes found in data)"
+          continue
+        print str(len(final)) + " gene(s) assigned"
+        df_tmp=pd.DataFrame(final[0:len(final)])[[0,1]]
         df_tmp.columns=['pathID','KEGGid']
         df_pg=pd.concat([df_pg,df_tmp])
     df=pd.merge(df,df_pg,on=["pathID"], how="outer")
@@ -323,7 +328,16 @@ if args.findKEGGdb:
 
 ################### paths to files #########################
 diff_out = os.path.realpath(args.inputFolder)
+if not args.originalGTF:
+  print "Error: no original GTF file provided"
+  sys.exit(65) 
+  # else on 'os.path.realpath'
+  #AttributeError: 'NoneType' object has no attribute 'startswith'
+  #Segmentation fault
 original_gtf = os.path.realpath(args.originalGTF)
+if not args.cuffcompareGTF:
+  print "Error: no cuffcompare GTF file provided"
+  sys.exit(65)
 merged_fixed_gtf = os.path.realpath(args.cuffcompareGTF)
 python_output = args.outputFolder
 genomes_folder=original_gtf.split('/')
@@ -583,7 +597,7 @@ for sig, label in zip(sig_choice,label_choice):
             tmp = pd.DataFrame(df.gene.str.split(',',1).tolist())
             if len(tmp) < 1:
                 print "skipping empty file"
-                continue
+                #continue
             tmp = pd.DataFrame(tmp.ix[:,0])
             tmp.columns = ['identifier']
             df = pd.concat([df,tmp], axis=1)
