@@ -2,123 +2,11 @@
 
 
 ###############################################################################
-### options
-###############################################################################
-
-
-import os
-import sys
-import argparse
-
-sys.stdout.flush()
-
-parser = argparse.ArgumentParser()
-
-parser.add_argument("-d", "--description", 
-    help="Get a description of what this script does.", 
-    action="store_true")
-
-parser.add_argument("-i", "--input", dest="path_in", metavar="PATH",
-    help="Input folder, which is the path to the cuffdiff output folder.")
-parser.add_argument("-o", "--output", dest="path_out", metavar="PATH",
-    help="Output folder path. Default: 'go_david/'",
-    default='go_david/')
-#parser.add_argument("path_in", metavar="INPUT",
-#    help="Input folder, which is the path to the cuffdiff output folder.")
-#parser.add_argument("path_out", metavar="OUTPUT",
-#    help="Output folder path.")
-parser.add_argument("-u", "--user", 
-    help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
-parser.add_argument("-g", "--gtf-original", dest="path_gtf_ori", metavar="PATH",
-    help="Original/downloaded GTF")
-parser.add_argument("-c", "--gtf-cuffcompare", dest="path_gtf_cuff", metavar="PATH",
-    help="Merged cuffcompared GTF")
-
-
-
-parser.add_argument("-f", "--files", dest='in_files', metavar="FILE[,FILE,...]",
-    help="""A comma separated list of files for which analysis is performed.
-    Must match one of the cuffdiff *.diff output files.
-    Implies '-n'. 
-    Default: 'gene_exp.diff,promoters.diff,splicing.diff,cds.diff,isoform_exp.diff'""", 
-    default='gene_exp.diff,promoters.diff,splicing.diff,cds.diff,isoform_exp.diff')
-parser.add_argument("-n", "--short-name", dest="short_name", metavar="NAME[,NAME,...]",
-    help="""A comma separated list of short output names/labels. The values
-    are related to those of the '-f' argument file list. No '.' (dots) allowed. 
-    Default: 'geneexp,prom,splic,cds,iso'""",
-    default='geneexp,prom,splic,cds,iso')
-
-parser.add_argument("-s", "--sig_only", dest="sig_only",
-    help="Only create report tables for cuffdiff-labeled significantly changed genes", 
-    action="store_true")
-parser.add_argument("-t", "--as-tsv", dest="as_tsv",
-    help="For p values > = 1 write tables as tab separated values", 
-    action="store_true")
-
-parser.add_argument("--david-tag", dest="david_tag", metavar="ID", # david_tag ?
-    help="""DAVID's id for your dataset. List of ids available at 
-    http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
-    Default: 'WORMBASE_GENE_ID'""",
-    default='WORMBASE_GENE_ID')
-parser.add_argument("--david-term", dest="david_term", metavar="CATEGORY", # david_term?
-    help="""DAVID's categories you wish to analyse. List of available categories at
-    https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list. 
-    Default: 'GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE'""", 
-    default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
-
-args = parser.parse_args()
-
-msg_desc = """
-This script annotates gene_exp.diff, promoters.diff, splicing.diff, cds.diff, 
-and isoform_exp.diff cuffdiff tables. It generates 1 file for all results, 1 
-file for p<0.05, and 1 file/input table for q<0.05. 
-For significant values (i.e. q<0.05) it also generates tables containg all 
-pair-wise comparisons in different sheets as well as gene ontology enrichment
-files for biological processes (BP), cellular component (CC), and molecular function (MF).
-
-Required python packages:
-a) pip install --user pandas==0.15.2
-b) pip install --user numpy==1.9.2
-c) pip install --user rpy2==2.5.6
-d) pip install --user suds==0.4
-e) pip install --user openpyxl==2.1.4
-
-Required arguments: 
--i, -o, -G, -C
-
-Example:
-goDavid -u John.Doe@age.mpg.de \
--G /path/to/original.gtf -C /path/to/merged_and_compared.gtf \
--i /path/to/cuffdiff/ -o /path/to/result/
-
-*************************************
-Developed by Jorge Boucas at the group for Computational RNA Biology and Ageing
-of the Max Planck Institute for Biology of Ageing
-jorge.boucas@age.mpg.de
-"""
-
-if args.description:
-  print msg_desc
-  sys.exit(0)
-
-url_client = 'https://david.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl'
-url_location = 'https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap11Endpoint/'
-out_header = 'Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n'
-
-import pandas as pd
-import numpy as np
-import time
-from datetime import datetime
-import shutil
-from urllib import urlopen
-
-
-###############################################################################
 ### functions
 ###############################################################################
 
 
-def retrieve_GTF_field(field,gtf):
+def retrieve_GTF_field(field, gtf):
   field = pd.DataFrame(gtf[8].str.split(field).tolist())[1]
   field = field.astype(str)
   field = pd.DataFrame(field.str.split(';',1).tolist())
@@ -128,50 +16,50 @@ def retrieve_GTF_field(field,gtf):
 # end retrieve_GTF_field
 
 
-def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',
-    listName='List1', category = '', thd=0.1, ct=2, msgi=6):
-  #import ssl
-  #ssl._create_default_https_context = ssl._create_unverified_context
+def DAVIDenrich(listF, idType, bgF = '', resF = '', bgName = 'Background1',
+    listName='List1', category = '', thd = 0.1, ct = 2, msgi = " " * 6):
   from suds.client import Client
   import os
-  import ssl # fix
-  ssl._create_default_https_context = ssl._create_unverified_context # fix
+  import ssl
+  ssl._create_default_https_context = ssl._create_unverified_context
   if len(listF) > 0 and os.path.exists(listF):
     inputListIds = ','.join(open(listF).read().split('\n'))
-    print " "*msgi + 'list loaded'
+    print msgi + 'list loaded'
     sys.stdout.flush()
   else:
-    print " "*msgi + 'no list loaded'
+    print msgi + 'no list loaded'
     sys.stdout.flush()
     raise
   flagBg = False
   if len(bgF) > 0 and os.path.exists(bgF):
     inputBgIds = ','.join(open(bgF).read().split('\n'))
     flagBg = True
-    print " "*msgi + 'use file background'
+    print msgi + 'use file background'
     sys.stdout.flush()
   else:
-    print " "*msgi + 'use default background'
+    print msgi + 'use default background'
     sys.stdout.flush()
   client = Client(url_client)
   client.wsdl.services[0].setlocation(url_location)
-  print " "*msgi + 'user Authentication:',client.service.authenticate(args.user)
+  print msgi + 'user Authentication:', client.service.authenticate(args.user)
   sys.stdout.flush()
   listType = 0
   size=client.service.addList(inputListIds,idType,listName,listType)
-  #print 'Percentage mapped(list):', client.service.addList(inputListIds,idType,listName,listType)
-  print " "*msgi + 'percentage mapped(list): %s' %str(size)
+  #print 'Percentage mapped(list):', client.service.addList(
+    #inputListIds,idType,listName,listType)
+  print msgi + 'percentage mapped(list): %s' %str(size)
   sys.stdout.flush()
   if float(size) > float(0):
     if flagBg:
       listType = 1
-      print " "*msgi + 'percentage mapped(background):', client.service.addList(inputBgIds,idType,bgName,listType)
+      print msgi + 'percentage mapped(background):', client.service.addList(
+          inputBgIds,idType,bgName,listType)
       sys.stdout.flush()
-    print " "*msgi + 'use categories:', client.service.setCategories(category)
+    print msgi + 'use categories:', client.service.setCategories(category)
     sys.stdout.flush()
     chartReport = client.service.getChartReport(thd,ct)
     chartRow = len(chartReport)
-    print " "*msgi + 'total chart records:',chartRow
+    print msgi + 'total chart records:',chartRow
     sys.stdout.flush()
     if len(resF) == 0 or not os.path.exists(resF):
       if flagBg:
@@ -199,19 +87,21 @@ def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',
             categoryName,termName,listHits,percent,ease,Genes,listTotals,
             popHits,popTotals,foldEnrichment,bonferroni,benjamini,FDR]
         fOut.write('\t'.join(rowList)+'\n')
-      print " "*msgi + 'write file:', resF, 'finished'
+      print msgi + 'write file:', resF, 'finished'
       sys.stdout.flush()
 # end DAVIDenrich
 
 
 def DAVIDget(cat, filtered_table, all_genes_table):
-  IDs_table = pd.merge(filtered_table, all_genes_table, how='left', left_on='identifier', right_on='g_name')
+  IDs_table = pd.merge(filtered_table, all_genes_table, how='left', 
+      left_on='identifier', right_on='g_name')
   IDs_table = IDs_table[['g_id']].dropna()
   IDs_table.to_csv('targets_tmp.txt',sep='\t',header=False,index=False)
   background = all_genes_table[['g_id']].dropna()
   background.to_csv('background_tmp.txt',sep='\t',header=False,index=False)
   DAVIDenrich(listF = './targets_tmp.txt', bgF = './background_tmp.txt', 
-      idType = DAVID_id, bgName = 'all_RNAseq_genes', listName = 'changed_genes', category = cat)
+      idType = DAVID_id, bgName = 'all_RNAseq_genes',
+      listName = 'changed_genes', category = cat)
   if os.path.isfile('targets_tmp.txt.withBG.chartReport'):
     enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
     os.remove('targets_tmp.txt.withBG.chartReport')
@@ -245,19 +135,118 @@ def DAVIDwrite(table_of_interest, name_vs_id_table, sheet_name):
     if len(enr.index) >= 1:
       recovered_cats=list(set(enr['Category'].tolist()))
       for c in recovered_cats:
-        enr[enr['Category']==c].to_csv(path_out+"/DAVID."+c+"_"+label+
+        enr[enr['Category']==c].to_csv(path_out+"/.david."+c+"_"+label+
             "_"+outshort+"."+sheet_name+".tmp",index=False, sep="\t")
 # end DAVIDwrite
 
 
+
 ###############################################################################
-### paths
+### options
 ###############################################################################
 
 
-print "* checking paths"
-if args.path_in is None:
-  print "Error: supply '-o PATH'"
+import os
+import sys
+import argparse
+
+sys.stdout.flush()
+
+help_desc = """
+description:
+  This script annotates gene_exp.diff, promoters.diff, splicing.diff, cds.diff, 
+  and isoform_exp.diff cuffdiff tables. It generates 1 file for all results, 1 
+  file for p<0.05, and 1 file/input table for q<0.05. 
+  For significant values (i.e. q<0.05) it also generates tables containg all 
+  pair-wise comparisons in different sheets as well as gene ontology enrichment
+  files for biological processes (BP), cellular component (CC), and molecular function (MF).
+
+required python packages:
+  a) pip install --user pandas==0.15.2
+  b) pip install --user numpy==1.9.2
+  d) pip install --user suds==0.4
+  e) pip install --user openpyxl==2.1.4
+
+example:
+  goDavid -u John.Doe@age.mpg.de -G /path/to/original.gtf \\
+      -C /path/to/merged_and_compared.gtf \\
+      -i /path/to/cuffdiff/ -o /path/to/result/
+"""
+
+help_epi="""
+  Developed by Jorge Boucas at the group for Computational RNA Biology and Ageing
+  of the Max Planck Institute for Biology of Ageing
+  jorge.boucas@age.mpg.de
+"""
+
+
+parser = argparse.ArgumentParser(description = help_desc, epilog = help_epi, 
+    formatter_class=argparse.RawDescriptionHelpFormatter)
+    #formatter_class=argparse.RawTextHelpFormatter)
+
+#parser.add_argument("path_in", metavar="path/to/cuffdiff/",
+#    help="Input folder, which is the path to the cuffdiff output folder.")
+#parser.add_argument("path_out", metavar="OUTPUT",
+#    help="Output folder path.")
+parser.add_argument("-i", "--input", dest="path_in", metavar="PATH",
+    help="Input folder, which is the path to the cuffdiff output folder.")
+parser.add_argument("-o", "--output", dest="path_out", metavar="PATH",
+    help="Output folder path. Default: 'go_david/'",
+    default='go_david/')
+parser.add_argument("-u", "--user", 
+    help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
+parser.add_argument("-g", "--gtf-original", dest="path_gtf_ori", metavar="PATH",
+    help="Original/downloaded GTF")
+parser.add_argument("-c", "--gtf-cuffcompare", dest="path_gtf_cuff", metavar="PATH",
+    help="Merged cuffcompared GTF")
+parser.add_argument("-f", "--files", dest='in_files', metavar="FILE[,FILE,...]",
+    help="""A comma separated list of files for which analysis is performed.
+    Must match one of the cuffdiff *.diff output files.
+    Implies '-n'. 
+    Default: 'gene_exp.diff,promoters.diff,splicing.diff,cds.diff,isoform_exp.diff'""", 
+    default='gene_exp.diff,promoters.diff,splicing.diff,cds.diff,isoform_exp.diff')
+parser.add_argument("-n", "--short-name", dest="short_name", metavar="NAME[,NAME,...]",
+    help="""A comma separated list of short output names/labels. The values
+    are related to those of the '-f' argument file list. No '.' (dots) allowed. 
+    Default: 'geneexp,prom,splic,cds,iso'""",
+    default='geneexp,prom,splic,cds,iso')
+
+# -t --threshold VAL > 0 to 1, default 0.05
+# -s --significance-type TYPE 1 of ['q_value','p_value','sign']
+
+# drop:
+parser.add_argument("-s", "--sig_only", dest="sig_only",
+    help="Only create report tables for cuffdiff-labeled significantly changed genes", 
+    action="store_true")
+# drop:
+parser.add_argument("-t", "--as-tsv", dest="as_tsv",
+    help="For p values > = 1 write tables as tab separated values", 
+    action="store_true")
+
+parser.add_argument("--david-tag", dest="david_tag", metavar="ID", # david_tag ?
+    help="""DAVID's id for your dataset. List of ids available at 
+    http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
+    Default: 'WORMBASE_GENE_ID'""",
+    default='WORMBASE_GENE_ID')
+parser.add_argument("--david-term", dest="david_term", metavar="CATEGORY", # david_term?
+    help="""DAVID's categories you wish to analyse. List of available categories at
+    https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list. 
+    Default: 'GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE'""", 
+    default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
+
+args = parser.parse_args()
+
+
+###############################################################################
+### checks
+###############################################################################
+
+if args.help_long:
+  parser.print_help()
+  print msg_help_long
+  sys.exit(0)
+if not args.path_in:
+  print "Error: provide '-i PATH' or '-h' or '-H'"
   sys.exit(65)
 if args.path_gtf_ori is None:
   print "Error: supply '-g PATH'"
@@ -268,32 +257,59 @@ if args.path_gtf_cuff is None:
 if args.user is None:
   print "Error: supply '-u USER'"
   sys.exit(65)
-
-path_in = os.path.realpath(args.path_in)
-if not os.path.exists(path_in):
+if not os.path.exists(args.path_in):
   print "Error: input path not found"
   sys.exit(65)
 
+
+
+###############################################################################
+###############################################################################
+
+import pandas as pd
+import numpy as np
+import time
+from datetime import datetime
+import shutil
+from urllib import urlopen
+
+url_client = 'https://david.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl'
+url_location = 'https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap11Endpoint/'
+out_header = 'Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n'
+path_in = os.path.realpath(args.path_in)
 path_gtf_ori = os.path.realpath(args.path_gtf_ori)
 path_gtf_cuff = os.path.realpath(args.path_gtf_cuff)
 path_out = args.path_out
-
 if not os.path.exists(path_out):
   os.makedirs(path_out)
-path_out=os.path.realpath(path_out)
+if not os.path.exists(path_out + '/xlsx/'):
+  os.makedirs(path_out + '/xlsx/')
+path_out = os.path.realpath(path_out)
+all_files = ['gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff',
+  'isoform_exp.diff']
+in_files=args.in_files
+in_files=in_files.split(",")
+short_name=args.short_name
+short_name=short_name.split(",")
 
+###############################################################################
+### inform
+###############################################################################
+
+print "* options:"
 print "  input: " + path_in
-sys.stdout.flush()
+#sys.stdout.flush()
 print "  output: " + path_out
-sys.stdout.flush()
-print "  gtf: "+path_gtf_ori
-sys.stdout.flush()
+#sys.stdout.flush()
+print "  gtf: " + path_gtf_ori
+#sys.stdout.flush()
 print "  cuffcompare curated gtf: " + path_gtf_cuff
-sys.stdout.flush()
+#sys.stdout.flush()
 print "  files: " + args.in_files
-sys.stdout.flush()
-print "  short names: "+args.short_name
-sys.stdout.flush()
+#sys.stdout.flush()
+print "  short names: " + args.short_name
+#sys.stdout.flush()
+print "  DAVID user id: " + args.user
 
 if args.sig_only:
   print "* reporting only significantly changed genes"
@@ -304,15 +320,9 @@ else:
   label_choice = ['diff_p.05','diff_all','diff_sig']
 
 print "* performing DAVID GO enrichment analysis"
-print "* DAVID user id: " + args.user
 
 sys.stdout.flush()
 
-in_files=args.in_files
-in_files=in_files.split(",")
-
-short_name=args.short_name
-short_name=short_name.split(",")
 
 # Check DAVID's ID for your set:
 # http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
@@ -335,7 +345,7 @@ else:
   print "  getting list of gene names and respective ids present in the data set"
   sys.stdout.flush()
   genes = pd.DataFrame()
-  for file in ['gene_exp.diff', 'promoters.diff', 'splicing.diff', 'cds.diff', 'isoform_exp.diff']:
+  for file in all_files:
     df = pd.read_table(file)
     df = df[['gene']]
     genes = pd.concat([genes,df]).drop_duplicates()
@@ -377,44 +387,48 @@ name_id = pd.read_table(path_out+"/genes_table.txt", sep="\t")
 
 for sig, label in zip(sig_choice,label_choice):
   print "* processing sign=" + str(sig) 
-  if sig != 'yes':
-    if sig >= 1:
-      if args.as_tsv:
-        print "  using .tsv format"
-      else:
-        writer = pd.ExcelWriter(path_out+'/'+label+'.xlsx')
-    else:
-      writer = pd.ExcelWriter(path_out+'/'+label+'.xlsx')
-    print "  writing xlsx"
-    sys.stdout.flush()
+  #if sig != 'yes':
+    #if sig >= 1:
+    #  if args.as_tsv:
+    #    print "  using .tsv format"
+    #  else:
+    #    writer = pd.ExcelWriter(path_out+'/'+label+'.xlsx')
+    #else:
+    #  writer = pd.ExcelWriter(path_out+'/'+label+'.xlsx')
+    #print "  writing xlsx"
+    #sys.stdout.flush()
   for imp, outshort in zip(in_files, short_name):
     print "  analysing " + imp
     df = pd.read_table(imp)
+    print "    n.df = " + str(len(df)) # debug
     if len(df) == 0:
-      print "    %s table is empty. Make sure the GTF reference you used for cuffdiff contains p_ids." %imp
+      print "    %s table is empty. " %imp
+      print "Make sure the GTF reference you used for cuffdiff contains p_ids."
+      # use continue here
     else:
       sys.stdout.flush()
-      if sig == 'yes':
-        writer = pd.ExcelWriter(path_out+'/'+label+'_'+outshort+'.xlsx')
-        print "    writing table " + label + "_" + outshort + ".xlsx"
-        sys.stdout.flush()
-      df = df.sort('p_value')
+      #if sig == 'yes':
+        #writer = pd.ExcelWriter(path_out+'/'+label+'_'+outshort+'.xlsx')
+        #print "    writing table " + label + "_" + outshort + ".xlsx"
+        #sys.stdout.flush()
+      #df = df.sort('p_value')
       df = df.sort('q_value')
       if sig == 'yes':
         df = df[df['significant'] == 'yes']
       else:
-        df = df[df['p_value'] < sig]
+        df = df[df['q_value'] <= sig]
       df = df.reset_index()
       df['gene'] = df['gene'].astype(str)
       tmp = pd.DataFrame(df.gene.str.split(',',1).tolist())
-      print "    n = " + str(len(tmp))
+      print "    n = " + str(len(tmp)) # still debug (?)
       if len(tmp) < 1:
         print "    skipping empty file"
         continue
       tmp = pd.DataFrame(tmp.ix[:,0])
       tmp.columns = ['identifier']
       df = pd.concat([df,tmp], axis=1)
-      if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
+      # for isoform_exp.diff we want to have the transcript references
+      if imp == 'isoform_exp.diff': 
         gtf = pd.read_table(path_gtf_cuff, sep='\t', skiprows=6, header=None)
         t_id = retrieve_GTF_field('transcript_id',gtf)
         n_ref = retrieve_GTF_field('nearest_ref',gtf)
@@ -423,7 +437,8 @@ for sig, label in zip(sig_choice,label_choice):
         df = pd.merge(id_ref, df, how='right', left_on='transcript_id', right_on='test_id')
         # for significant changes also report overlaps between the days, pair-wise, 
         # as well as go ontology enrichemnt for each table from DAVID
-      if sig == 'yes':
+      #if sig == 'yes':
+      if True:
         sample1 = df[['sample_1']]
         sample1.columns=['samples']
         sample2 = df[['sample_2']]
@@ -447,13 +462,14 @@ for sig, label in zip(sig_choice,label_choice):
                   if imp not in ['gene_exp.diff','isoform_exp.diff']:
                     df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
                   df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
+                  df_pair.to_csv(writer,
 
       df.drop(['test_id','index','gene_id','identifier'], axis=1, inplace=True)
       if imp not in ['gene_exp.diff','isoform_exp.diff']:
         df.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
-      if sig == 'yes':
-        df.to_excel(writer, 'ALL', index=False)
-        writer.save()
+      #if sig == 'yes':
+        #df.to_excel(writer, 'ALL', index=False)
+        #writer.save()
 
     if sig != 'yes':
       if sig >= 1:
@@ -475,26 +491,26 @@ for sig, label in zip(sig_choice,label_choice):
       writer.save()
 
 DAVID_tmp_files=os.listdir(path_out)
-DAVID_tmp_files=[ s for s in DAVID_tmp_files if "DAVID" in s ]
+DAVID_tmp_files=[ s for s in DAVID_tmp_files if ".david." in s ]
 DAVID_tmp_files=[ s for s in DAVID_tmp_files if "tmp" in s ]
 cat_to_exc=[]
 for f in DAVID_tmp_files:
-  c=f.split(".")[1]
+  c=f.split(".")[2]
   cat_to_exc.append(c)
 cat_to_exc=list(set(cat_to_exc))
 for c in cat_to_exc:
-  writer = pd.ExcelWriter(path_out+'/'+c+'.xlsx')
+  writer = pd.ExcelWriter(path_out+'/xlsx/'+c+'.xlsx')
   cat_files=[s for s in DAVID_tmp_files if c in s]
   for f in cat_files:
     df=pd.read_table(path_out+'/'+f)
-    sheet_name=f.split(".")[2]
+    sheet_name=f.split(".")[3]
     df.to_excel(writer, sheet_name, index=False)
   writer.save()
 
-print "* removing tmp files"
+print "* tmp files"
 for f in DAVID_tmp_files:
-  print "  file " + f
-  os.remove(path_out+'/'+f)
+  print "  " + f
+  #os.remove(path_out+'/'+f)
 
 
 print "\n\nDone\n"
