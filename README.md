@@ -1,54 +1,80 @@
-# README #
+# rnaseq-tools
 
-This repository hosts scripts and tools for RNAseq analysis
+This repository hosts scripts and tools for RNAseq analysis.
 
-#### tuxedo-slurm.sh
-this script runs a full RNAseq pipeline under a slurm jobs distribution system <br />
-fastQC - quality control <br />
-flexbar - adapters and quality trimming <br />
-tophat - aligner <br />
-cufflinks - transcripts assembly and quantification <br />
-cuffmerge - merging of assemblies <br />
-cuffcompare - corrrection of lost protein ids <br />
-cuffquant - transcript expression profiles <br />
-cuffdiff - differential expression analysis <br />
+## Tools
+
+### tuxedo-slurm.sh
+
+This script runs a full RNAseq pipeline under a slurm jobs distribution system
+
+* fastQC - quality control 
+* flexbar - adapters and quality trimming 
+* tophat - aligner 
+* cufflinks - transcripts assembly and quantification 
+* cuffmerge - merging of assemblies 
+* cuffcompare - corrrection of lost protein ids 
+* cuffquant - transcript expression profiles 
+* cuffdiff - differential expression analysis 
 
 Please read the instructions inside the script for usage.
 
-#### tuxedo_v3-slurm.sh 
-this script runs a full RNAseq pipeline under a slurm jobs distribution system <br />
-using about 18 processes per file allowing full analysis of 20 libraries with <br />
-50 - 150 M reads per library to complete under 12h <br />
-fastQC - quality control <br />
-flexbar - adapters and quality trimming <br />
-hisat - aligner <br />
-stringtie - transcripts assembly and quantification <br />
-cuffmerge - merging of assemblies <br />
-cuffquant - transcript expression profiles <br />
-cuffdiff - differential expression analysis <br />
+### tuxedo_v3-slurm.sh
 
-Please read the instructions inside the script for usage. <br />
+This script runs a full RNAseq pipeline under a slurm jobs distribution system 
+using about 18 processes per file allowing full analysis of 20 libraries with 
+50 - 150 M reads per library to complete under 12h 
+
+* fastQC - quality control 
+* flexbar - adapters and quality trimming 
+* hisat - aligner 
+* stringtie - transcripts assembly and quantification 
+* cuffmerge - merging of assemblies 
+* cuffquant - transcript expression profiles 
+* cuffdiff - differential expression analysis 
+
+Please read the instructions inside the script for usage. 
 
 ####  aDiff
-this python script takes cuffdiff results as inputs and generates excel report <br />
-tables for each parallel comparison. It annotates each gene with the respective <br />
-GO term. It also uses DAVID to perform GO enrichment analysis of biological process, <br />
-cellular components,  and molecular function using significantly changed genes, <br />
+
+This python script takes cuffdiff results as inputs and generates excel report 
+tables for each parallel comparison. It annotates each gene with the respective 
+GO term. It also uses DAVID to perform GO enrichment analysis of biological process, 
+cellular components,  and molecular function using significantly changed genes, 
 transcripts, promoter usage, splicing, CDS.
 
-usage: ```srun aDiff -h```<br />
+Usage: 
+
+```
+srun aDiff -h
+```
 
 #### QC.R
 
-this R scripts requires the cummeRbund package
-
-[in R] ```source('http://www.bioconductor.org/biocLite.R')```
-
-[in R] ```biocLite('cummeRbund', ask=FALSE)``` 
-
-to perform a minimal quality control analysis on cuffdiff outputs. <br />
-cummeRbund output folder needs to be created before using this script. <br />
-Not all plot allways perform with every dataset - you might therefore need to <br />
+This R script performs a minimal quality control analysis on cuffdiff outputs. 
+The output folder needs to be created before using this script. 
+Not all plot allways perform with every dataset - you might therefore need to 
 comment out some plots.
 
-usage: ```srun Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder```
+This R scripts requires the `cummeRbund` package. To install it, run the following
+in an `R` console:
+
+```
+source('http://www.bioconductor.org/biocLite.R')
+biocLite('cummeRbund', ask=FALSE)
+```
+
+Usage:
+
+```
+mkdir cummeRbund_output_folder
+srun Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder
+```
+
+## License
+
+> Copyright 2015
+> * Jorge Boucas <JBoucas@age.mpg.de>
+> * Sven Templer <templer@age.mpg.de>
+
+See file `LICENSE`.
