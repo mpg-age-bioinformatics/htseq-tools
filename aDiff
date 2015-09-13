@@ -321,6 +321,7 @@ if args.findKEGGdb:
     sys.stdout.flush()
     gtf = gtf.astype(str)
     gene_id = retrieve_GTF_field('gene_id',gtf)
+    gene_id.columns=['gene_id']
     gene_id = gene_id['gene_id'].tolist()
     find_KEGG_ensemblDB(args.KEGGorg,gene_id)
     sys.exit(0)
