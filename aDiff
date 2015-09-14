@@ -669,7 +669,7 @@ for sig, label in zip(sig_choice,label_choice):
         if sig != 'yes':
             if sig >= 1:
                 if args.TSV:
-                    df.to_csv(outshort+'_'+'ALL.tsv', index=False)
+                    df.to_csv(python_output+'/'+outshort+'_'+'ALL.tsv', index=False)
                 else:
                     df.to_excel(writer, outshort+'_'+'ALL', index=False)
 
