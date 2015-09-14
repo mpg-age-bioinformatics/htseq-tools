@@ -46,7 +46,7 @@ transcripts, promoter usage, splicing, CDS.
 Usage: 
 
 ```
-srun aDiff -h
+aDiff -h
 ```
 
 #### QC.R
@@ -68,7 +68,7 @@ Usage:
 
 ```
 mkdir cummeRbund_output_folder
-srun Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder
+Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder
 ```
 
 ## License
