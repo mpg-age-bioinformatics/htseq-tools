@@ -112,7 +112,7 @@ cd ${tmp}
 chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
 rm ../slurm_logs/fastqc_${file::(-9)}.*.out
 sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh 2>&1 | tee ${tmp}fastqc_${file::(-2)}id
-
+sleep 2
 id=$(cat ${tmp}fastqc_${file::(-2)}id | grep 'Submitted batch job')
 
 echo -n :${id:20} >> ${tmp}fastqc.ids
@@ -167,7 +167,7 @@ cd ${tmp}
 chmod 755 ${tmp}flexbar_${file::(-8)}sh
 rm ../slurm_logs/flexbar_${file::(-8)}*.out
 sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh 2>&1 | tee ${tmp}flexbar_${file::(-8)}id
-
+sleep 2
 id=$(cat ${tmp}flexbar_${file::(-8)}id | grep 'Submitted batch job')
 
 echo -n :${id:20} >> ${tmp}flexbar.ids
@@ -248,7 +248,7 @@ cd ${tmp}
 chmod 755 ${tmp}V3_HS_ST_${file::(-16)}.sh 
 rm ../slurm_logs/V3_HS_ST_${file::(-16)}.*.out
 sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_HS_ST_${file::(-16)}.%j.out ${tmp}V3_HS_ST_${file::(-16)}.sh 2>&1 | tee ${tmp}V3_HS_ST_${file::(-16)}.id
-
+sleep 2
 id=$(cat ${tmp}V3_HS_ST_${file::(-16)}.id | grep 'Submitted batch job')
 
 echo -n :${id:20} >> ${tmp}V3_HS_ST.ids
@@ -334,6 +334,7 @@ cd ${tmp}
 chmod 755 ${tmp}V3_quant_${file::(-4)}.sh
 rm ../slurm_logs/V3_quant_${file::(-4)}.*.out
 sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_quant_${file::(-4)}.%j.out ${tmp}V3_quant_${file::(-4)}.sh 2>&1 | tee ${tmp}V3_quant_${file::(-4)}.id
+sleep 2
 id=$(cat ${tmp}V3_quant_${file::(-4)}.id | grep 'Submitted batch job')
 echo -n :${id:20} >> ${tmp}V3_quant.ids
 rm ${tmp}V3_quant_${file::(-4)}.id
@@ -376,6 +377,7 @@ cd ${tmp}
 chmod 755 ${tmp}V3_diff_${serie}.sh
 rm ../slurm_logs/V3_diff_${serie}.*.out
 sbatch -p blade,himem,hugemem --mem=724gb --cpus-per-task=18 -o ../slurm_logs/V3_diff_${serie}.%j.out ${tmp}V3_diff_${serie}.sh
+sleep 2
 done
 
 exit
