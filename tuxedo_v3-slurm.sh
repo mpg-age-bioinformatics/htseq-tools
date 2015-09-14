@@ -90,18 +90,15 @@ function contains() {
 
 #############################################################################
 
-
-
-
 echo "Starting FASTQC"
-
-cd ${raw} 
 
 if [[ -e ${tmp}fastqc.ids ]]; then
 rm ${tmp}fastqc.ids
 fi
 
+cd ${raw} 
 for serie in $series; do
+cd ${raw}
 for file in $(ls *${serie}*.fastq.gz); do echo "#!/bin/bash
 module load pigz
 module load FastQC
@@ -128,14 +125,13 @@ srun -p blade,himem,hugemem -d afterok${fastqc_ids} echo "FASTQC done"
 
 #############################################################################
 
-cd ${raw}
-
 if [[ -e ${tmp}flexbar.ids ]]; then
 rm ${tmp}flexbar.ids
 fi
 
-
+cd ${raw}
 for serie in $series; do
+cd ${raw}
 for file in $(ls *${serie}*1.fastq.gz); do
 
 if [[ -e ${file::(-10)}2.fastq.gz ]]; then
@@ -146,7 +142,7 @@ module load Flexbar
 flexbar -r ${tmp}${file::(-10)}1.fastq \
 -p ${tmp}${file::(-10)}2.fastq -t ${top}raw_trimmed/${file::(-11)} \
 -n 18 -a ${adapters_file} \
--ao 10 -u 5 -q 20 -m 20 -f i1.5 -ae ANY
+-ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
 cd ${top}raw_trimmed
 pigz -p 18 ${file::(-10)}1.fastq
 pigz -p 18 ${file::(-10)}2.fastq
@@ -160,7 +156,7 @@ module load Flexbar
 flexbar -r ${tmp}${file::(-10)}1.fastq \
 -t ${top}raw_trimmed/${file::(-11)}_1 \
 -n 18 -a ${adapters_file} \
--ao 10 -u 5 -q 20 -m 20 -f i1.5 -ae ANY
+-ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
 cd ${top}raw_trimmed
 pigz -p 18 ${file::(-3)}
 rm ${tmp}flexbar_${file::(-8)}sh" > ${tmp}flexbar_${file::(-8)}sh
@@ -190,11 +186,9 @@ if [[ -e ${tmp}V3_HS_ST.ids ]]; then
 rm ${tmp}V3_HS_ST.ids
 fi
 
-
 cd ${rawt}
-
-
 for serie in $series; do
+cd ${rawt}
 for file in $(ls *${serie}*1.fastq.gz); do 
 
 
