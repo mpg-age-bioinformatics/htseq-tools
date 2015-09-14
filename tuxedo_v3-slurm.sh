@@ -28,17 +28,17 @@ Make sure you have edited the last section of this script - cuffdiff - before yo
 SE_unstr=("YiTS" "YiDR" "YiIS" "ShTe")
 SE_str=("Yid1" "OeDA" "AgMi")
 PE_str=("RoSt" "HaTS" "HaIS")
-PE_uns=("XuFC")
+PE_uns=("XHFC")
 mix=("Yid3")
 
-unstr=("YiTS" "YiDR" "YiIS" "ShTe" "XuFC")
+unstr=("YiTS" "YiDR" "YiIS" "ShTe" "XHFC")
 str=("Yid1" "OeDA" "RoSt" "HaTS" "HaIS" "AgMi" )
 #mix=("Yid3")
 
 
 # Which series do you which to work on:
 
-series="XuFC"
+series="XHFC"
 
 # Reference genome
 
@@ -350,7 +350,7 @@ srun -p blade,himem,hugemem -d afterok${quant_ids} echo "Starting cuffdiff"
 
 #### cuff diff >>>> one section per serie ######
 
-serie=XuFC
+serie=XHFC
 mkdir ${top}V3_cuffdiff_output/${serie}
 dout=$(readlink -f ${top}V3_cuffdiff_output/${serie})
 lib="fr-unstranded"
@@ -363,9 +363,9 @@ cuffdiff -p 18 --library-type ${lib} \
 -L Fema_Y,Male_Y,Male_O \
 -o ${dout} --dispersion-method per-condition \
 ${top}V3_cuffmerge_output/${series}/merged.gtf \
-S_002-F_XuFC-L_____F-__Y-____-REP_2/abundances.cxb,S_003-F_XuFC-L_____F-__Y-____-REP_3/abundances.cxb,S_004-F_XuFC-L_____F-__Y-____-REP_4/abundances.cxb,S_006-F_XuFC-L_____F-__Y-____-REP_6/abundances.cxb,S_007-F_XuFC-L_____F-__Y-____-REP_7/abundances.cxb,S_008-F_XuFC-L_____F-__Y-____-REP_8/abundances.cxb \
-S_009-F_XuFC-L_____M-__Y-____-REP_1/abundances.cxb,S_010-F_XuFC-L_____M-__Y-____-REP_2/abundances.cxb,S_011-F_XuFC-L_____M-__Y-____-REP_3/abundances.cxb,S_012-F_XuFC-L_____M-__Y-____-REP_4/abundances.cxb,S_013-F_XuFC-L_____M-__Y-____-REP_5/abundances.cxb,S_014-F_XuFC-L_____M-__Y-____-REP_6/abundances.cxb,S_015-F_XuFC-L_____M-__Y-____-REP_7/abundances.cxb \
-S_017-F_XuFC-L_____M-__O-____-REP_1/abundances.cxb,S_018-F_XuFC-L_____M-__O-____-REP_2/abundances.cxb,S_019-F_XuFC-L_____M-__O-____-REP_3/abundances.cxb,S_020-F_XuFC-L_____M-__O-____-REP_4/abundances.cxb,S_021-F_XuFC-L_____M-__O-____-REP_5/abundances.cxb
+S_002-F_XHFC-L_____F-__Y-____-REP_2/abundances.cxb,S_003-F_XHFC-L_____F-__Y-____-REP_3/abundances.cxb,S_004-F_XHFC-L_____F-__Y-____-REP_4/abundances.cxb,S_006-F_XHFC-L_____F-__Y-____-REP_6/abundances.cxb,S_007-F_XHFC-L_____F-__Y-____-REP_7/abundances.cxb,S_008-F_XHFC-L_____F-__Y-____-REP_8/abundances.cxb \
+S_009-F_XHFC-L_____M-__Y-____-REP_1/abundances.cxb,S_010-F_XHFC-L_____M-__Y-____-REP_2/abundances.cxb,S_011-F_XHFC-L_____M-__Y-____-REP_3/abundances.cxb,S_012-F_XHFC-L_____M-__Y-____-REP_4/abundances.cxb,S_013-F_XHFC-L_____M-__Y-____-REP_5/abundances.cxb,S_014-F_XHFC-L_____M-__Y-____-REP_6/abundances.cxb,S_015-F_XHFC-L_____M-__Y-____-REP_7/abundances.cxb \
+S_017-F_XHFC-L_____M-__O-____-REP_1/abundances.cxb,S_018-F_XHFC-L_____M-__O-____-REP_2/abundances.cxb,S_019-F_XHFC-L_____M-__O-____-REP_3/abundances.cxb,S_020-F_XHFC-L_____M-__O-____-REP_4/abundances.cxb,S_021-F_XHFC-L_____M-__O-____-REP_5/abundances.cxb
 
 rm ${tmp}V3_diff_${serie}.sh" > ${tmp}V3_diff_${serie}.sh
 
