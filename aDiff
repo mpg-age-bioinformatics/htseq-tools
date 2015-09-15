@@ -168,6 +168,7 @@ def KEGG_paths(organism):
     return df_final
 
 def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
+    # adapted from HuangYi @ 20110424 as available on https://david.ncifcrf.gov
     #import ssl
     #ssl._create_default_https_context = ssl._create_unverified_context
     from suds.client import Client
