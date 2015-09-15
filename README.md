@@ -39,7 +39,7 @@ Please read the instructions inside the script for usage.
 
 This python script takes cuffdiff results as inputs and generates excel report 
 tables for each parallel comparison. It annotates each gene with the respective 
-GO term. It also uses DAVID to perform GO enrichment analysis of biological process, 
+GO and KEGG term. It also uses DAVID to perform GO enrichment analysis of biological process, 
 cellular components,  and molecular function using significantly changed genes, 
 transcripts, promoter usage, splicing, CDS.
 
