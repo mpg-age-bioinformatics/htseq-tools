@@ -272,6 +272,7 @@ rm ${tmp}V3_assemblies_${serie}.txt
 cd ${top}V3_stringtie_output
 mkdir full_coverage
 mv *_full_cov.gtf full_coverage
+cd full_coverage
 
 for gtf in $(ls *${serie}*.gtf); do
 readlink -f ${gtf} >> ${tmp}V3_assemblies_${serie}.txt
