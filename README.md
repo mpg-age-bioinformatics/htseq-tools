@@ -4,6 +4,16 @@ This repository hosts scripts and tools for RNAseq analysis.
 
 ## Tools
 
+#### build-ref.sh
+
+this is the script we use for downloading genome assemblies from ENSEMBL and 
+
+build the respective indexes and folders structure.
+ 
+ usage: ```build-ref.sh destination_folder```
+
+
+
 ### tuxedo-slurm.sh
 
 This script runs a full RNAseq pipeline under a slurm jobs distribution system
