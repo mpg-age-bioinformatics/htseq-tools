@@ -92,203 +92,167 @@ function contains() {
 
 echo "Starting FASTQC"
 
-if [[ -e ${tmp}fastqc.ids ]]; then
-rm ${tmp}fastqc.ids
-fi
+ids=
 
 cd ${raw} 
 for serie in $series; do
-cd ${raw}
-for file in $(ls *${serie}*.fastq.gz); do echo "#!/bin/bash
-module load pigz
-module load FastQC
-cp ${raw}${file} ${tmp}
-cd ${tmp}
-unpigz -p 4 ${file}
-fastqc -t 4 -o ../fastqc ${file::(-3)}
-rm ${tmp}fastqc_${file::(-9)}.sh" > ${tmp}fastqc_${file::(-9)}.sh
+    cd ${raw}
+    for file in $(ls *${serie}*.fastq.gz); do 
+        echo "#!/bin/bash
+        module load pigz
+        module load FastQC
+        cp ${raw}${file} ${tmp}
+        cd ${tmp}
+        unpigz -p 4 ${file}
+        fastqc -t 4 -o ../fastqc ${file::(-3)}
+        rm ${tmp}fastqc_${file::(-9)}.sh
+        " > ${tmp}fastqc_${file::(-9)}.sh
 
-cd ${tmp} 
-chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
-rm ../slurm_logs/fastqc_${file::(-9)}.*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh 2>&1 | tee ${tmp}fastqc_${file::(-2)}id
-sleep 2
-id=$(cat ${tmp}fastqc_${file::(-2)}id | grep 'Submitted batch job')
-
-echo -n :${id:20} >> ${tmp}fastqc.ids
-rm ${tmp}fastqc_${file::(-2)}id
+        cd ${tmp} 
+        chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
+        rm ../slurm_logs/fastqc_${file::(-9)}.*.out
+        id=(sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh)d
+        sleep 2
+        ids=${ids}:${id:20}
+    done
 done
-done
 
-fastqc_ids=$(cat ${tmp}fastqc.ids)
-srun -p blade,himem,hugemem -d afterok${fastqc_ids} echo "FASTQC done"
+srun -p blade,himem,hugemem -d afterok${ids} echo "FASTQC done"
 
 #############################################################################
 
-if [[ -e ${tmp}flexbar.ids ]]; then
-rm ${tmp}flexbar.ids
-fi
+ids=
 
 cd ${raw}
 for serie in $series; do
-cd ${raw}
-for file in $(ls *${serie}*1.fastq.gz); do
+    cd ${raw}
+    for file in $(ls *${serie}*1.fastq.gz); do
+        if [[ -e ${file::(-10)}2.fastq.gz ]]; then
+            echo "#!/bin/bash 
+            module load pigz
+            module load Flexbar
+            flexbar -r ${tmp}${file::(-10)}1.fastq \
+            -p ${tmp}${file::(-10)}2.fastq -t ${top}raw_trimmed/${file::(-11)} \
+            -n 18 -a ${adapters_file} \
+            -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+            cd ${top}raw_trimmed
+            pigz -p 18 ${file::(-10)}1.fastq
+            pigz -p 18 ${file::(-10)}2.fastq
+            rm ${tmp}flexbar_${file::(-8)}sh
+            " > ${tmp}flexbar_${file::(-8)}sh
+        else
+            echo "#!/bin/bash
+            module load pigz
+            module load Flexbar
+            flexbar -r ${tmp}${file::(-10)}1.fastq \
+            -t ${top}raw_trimmed/${file::(-11)}_1 \
+            -n 18 -a ${adapters_file} \
+            -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
+            cd ${top}raw_trimmed
+            pigz -p 18 ${file::(-3)}
+            rm ${tmp}flexbar_${file::(-8)}sh
+            " > ${tmp}flexbar_${file::(-8)}sh
 
-if [[ -e ${file::(-10)}2.fastq.gz ]]; then
+        fi
 
-echo "#!/bin/bash 
-module load pigz
-module load Flexbar
-flexbar -r ${tmp}${file::(-10)}1.fastq \
--p ${tmp}${file::(-10)}2.fastq -t ${top}raw_trimmed/${file::(-11)} \
--n 18 -a ${adapters_file} \
--ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
-cd ${top}raw_trimmed
-pigz -p 18 ${file::(-10)}1.fastq
-pigz -p 18 ${file::(-10)}2.fastq
-rm ${tmp}flexbar_${file::(-8)}sh" > ${tmp}flexbar_${file::(-8)}sh
-
-else
-
-echo "#!/bin/bash
-module load pigz
-module load Flexbar
-flexbar -r ${tmp}${file::(-10)}1.fastq \
--t ${top}raw_trimmed/${file::(-11)}_1 \
--n 18 -a ${adapters_file} \
--ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
-cd ${top}raw_trimmed
-pigz -p 18 ${file::(-3)}
-rm ${tmp}flexbar_${file::(-8)}sh" > ${tmp}flexbar_${file::(-8)}sh
-
-fi
-
-cd ${tmp}
-chmod 755 ${tmp}flexbar_${file::(-8)}sh
-rm ../slurm_logs/flexbar_${file::(-8)}*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh 2>&1 | tee ${tmp}flexbar_${file::(-8)}id
-sleep 2
-id=$(cat ${tmp}flexbar_${file::(-8)}id | grep 'Submitted batch job')
-
-echo -n :${id:20} >> ${tmp}flexbar.ids
-rm ${tmp}flexbar_${file::(-8)}id
-done
+    cd ${tmp}
+    chmod 755 ${tmp}flexbar_${file::(-8)}sh
+    rm ../slurm_logs/flexbar_${file::(-8)}*.out
+    id=(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh)
+    sleep 2
+    ids=${ids}:${id:20}    
+    done
 done
 
-flexbar_ids=$(cat ${tmp}flexbar.ids)
-srun -p blade,himem,hugemem -d afterok${flexbar_ids} echo "FLEXBAR done"
+srun -p blade,himem,hugemem -d afterok${ids} echo "FLEXBAR done. Starting HiSat and StringTie"
 
 
 #############################################################################
 
-
-if [[ -e ${tmp}V3_HS_ST.ids ]]; then
-rm ${tmp}V3_HS_ST.ids
-fi
+ids=
 
 cd ${rawt}
 for serie in $series; do
-cd ${rawt}
-for file in $(ls *${serie}*1.fastq.gz); do 
+    cd ${rawt}
+    for file in $(ls *${serie}*1.fastq.gz); do 
+        if [[ $(contains "${SE_unstr[@]}" "$serie") == "y" ]]; then
+            lib=
+            files="-U ${file}"
+        elif [[ $(contains "${PE_uns[@]}" "$serie") == "y" ]]; then
+            lib=
+            files="-1 ${file} -2 ${file::(-10)}2.fastq.gz"
+        elif [[ $(contains "${SE_str[@]}" "$serie") == "y" ]]; then
+            lib="--rna-strandness R"
+            files="-U ${file}"
+        elif [[ $(contains "${PE_str[@]}" "$serie") == "y" ]]; then
+            lib="--rna-strandness RF"
+            files="-1 ${file} -2 ${file::(-10)}2.fastq.gz"
+        elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
+            files=-U ${file}
+            REP=${file:30:5}
+            if [[ ${REP} == REP_3 ]]; then
+                lib="--rna-strandness R"
+            else
+                lib=
+            fi
+        fi
 
+        echo "#!/bin/bash
+        cd ${rawt}
+        module load Bowtie2
+        module load HISAT
+        hisat -p 18 ${lib} --met-file ${top}V3_hisat_output/${file::(-16)}.stats \
+        -x ${hisat_index} -S ${top}V3_hisat_output/${file::(-16)}.sam \
+        ${files}
 
-if [[ $(contains "${SE_unstr[@]}" "$serie") == "y" ]]; then
-lib=
-files="-U ${file}"
+        cd ${top}V3_hisat_output
+        module load SAMtools
+        samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 - ${file::(-16)}
+        mkdir ${top}V3_stringtie_output/${file::(-16)}
 
-elif [[ $(contains "${PE_uns[@]}" "$serie") == "y" ]]; then
-lib=
-files="-1 ${file} -2 ${file::(-10)}2.fastq.gz"
+        module load StringTie
+        stringtie ${file::(-16)}.bam -o ${top}V3_stringtie_output/${file::(-16)}.gtf \
+        -p 18 -G ${ori_GTF} -f 0.99 \
+        -C ${top}V3_stringtie_output/${file::(-16)}_full_cov.gtf \
+        -b ${top}V3_stringtie_output/${file::(-16)} 
+        rm ${tmp}V3_HS_ST_${file::(-16)}.sh
+        " > ${tmp}V3_HS_ST_${file::(-16)}.sh
 
-elif [[ $(contains "${SE_str[@]}" "$serie") == "y" ]]; then
-lib="--rna-strandness R"
-files="-U ${file}"
-
-elif [[ $(contains "${PE_str[@]}" "$serie") == "y" ]]; then
-lib="--rna-strandness RF"
-files="-1 ${file} -2 ${file::(-10)}2.fastq.gz"
-
-elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
-files=-U ${file}
-REP=${file:30:5}
-
-if [[ ${REP} == REP_3 ]]; then
-lib="--rna-strandness R"
-else
-lib=
-fi
-fi
-
-echo "#!/bin/bash
-cd ${rawt}
-module load Bowtie2
-module load HISAT
-hisat -p 18 ${lib} --met-file ${top}V3_hisat_output/${file::(-16)}.stats \
--x ${hisat_index} -S ${top}V3_hisat_output/${file::(-16)}.sam \
-${files}
-
-cd ${top}V3_hisat_output
-module load SAMtools
-
-printf 'Filtering mapped reads and sorting bam file'
-
-samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 - ${file::(-16)}
-mkdir ${top}V3_stringtie_output/${file::(-16)}
-
-printf 'Starting StringTie'
-
-module load StringTie
-stringtie ${file::(-16)}.bam -o ${top}V3_stringtie_output/${file::(-16)}.gtf \
--p 18 -G ${ori_GTF} -f 0.99 \
--C ${top}V3_stringtie_output/${file::(-16)}_full_cov.gtf \
--b ${top}V3_stringtie_output/${file::(-16)} 
-rm ${tmp}V3_HS_ST_${file::(-16)}.sh" > ${tmp}V3_HS_ST_${file::(-16)}.sh
-
-cd ${tmp}
-chmod 755 ${tmp}V3_HS_ST_${file::(-16)}.sh 
-rm ../slurm_logs/V3_HS_ST_${file::(-16)}.*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_HS_ST_${file::(-16)}.%j.out ${tmp}V3_HS_ST_${file::(-16)}.sh 2>&1 | tee ${tmp}V3_HS_ST_${file::(-16)}.id
-sleep 2
-id=$(cat ${tmp}V3_HS_ST_${file::(-16)}.id | grep 'Submitted batch job')
-
-echo -n :${id:20} >> ${tmp}V3_HS_ST.ids
-rm ${tmp}V3_HS_ST_${file::(-16)}.id
-
-done
+        cd ${tmp}
+        chmod 755 ${tmp}V3_HS_ST_${file::(-16)}.sh 
+        rm ../slurm_logs/V3_HS_ST_${file::(-16)}.*.out
+        id=(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_HS_ST_${file::(-16)}.%j.out ${tmp}V3_HS_ST_${file::(-16)}.sh)
+        sleep 2
+        ids=${ids}:${id:20}
+    done
 done
 
-HS_ST_ids=$(cat ${tmp}V3_HS_ST.ids)
-srun -p blade,himem,hugemem -d afterok${HS_ST_ids} echo "HiSat and StringTie done"
+srun -p blade,himem,hugemem -d afterok${ids} echo "HiSat and StringTie done. Starting cuffmerge"
  
 #############################################################################
 
-echo "Starting cuffmerge"
-
-
 for serie in $series; do
+    rm ${tmp}V3_assemblies_${serie}.txt
 
-rm ${tmp}V3_assemblies_${serie}.txt
+    cd ${top}V3_stringtie_output
+    mkdir full_coverage
+    mv *_full_cov.gtf full_coverage
+    cd full_coverage
 
-cd ${top}V3_stringtie_output
-mkdir full_coverage
-mv *_full_cov.gtf full_coverage
-cd full_coverage
+    for gtf in $(ls *${serie}*.gtf); do
+        readlink -f ${gtf} >> ${tmp}V3_assemblies_${serie}.txt
+    done
 
-for gtf in $(ls *${serie}*.gtf); do
-readlink -f ${gtf} >> ${tmp}V3_assemblies_${serie}.txt
-done
+    cd ${top}
+    mkdir V3_cuffmerge_output/${serie}
+    cmout=$(readlink -f V3_cuffmerge_output/${serie})/
+    echo ${serie}
 
-cd ${top}
-mkdir V3_cuffmerge_output/${serie}
-cmout=$(readlink -f V3_cuffmerge_output/${serie})/
-echo ${serie}
-
-cd ${top}
-module load Cufflinks
-srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 \
--o ${cmout} --min-isoform-fraction 1.0 \
--g ${ori_GTF} -s ${genome} ${tmp}V3_assemblies_${serie}.txt
-
+    cd ${top}
+    module load Cufflinks
+    srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 \
+    -o ${cmout} --min-isoform-fraction 1.0 \
+    -g ${ori_GTF} -s ${genome} ${tmp}V3_assemblies_${serie}.txt
 done
 
 cd ${tmp}
@@ -298,53 +262,38 @@ cd ../scripts
 
 echo "Starting cuffquant"
 
-if [[ -e ${tmp}V3_quant.ids ]]; then
-rm ${tmp}V3_quant.ids
-fi
-
-
 for serie in $series; do
+    if [[ $(contains "${unstr[@]}" "$serie") == "y" ]]; then
+        lib="fr-unstranded"
+    elif [[ $(contains "${str[@]}" "$serie") == "y" ]]; then
+        lib="fr-firststrand"
+    elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
+        lib="fr-unstranded"
+    fi
 
-if [[ $(contains "${unstr[@]}" "$serie") == "y" ]]; then
-lib="fr-unstranded"
-
-elif [[ $(contains "${str[@]}" "$serie") == "y" ]]; then
-lib="fr-firststrand"
-
-
-elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
-lib="fr-unstranded"
-
-fi
-
-cd ${top}V3_hisat_output
-
-for file in $(ls *${serie}*.bam); do echo "#!/bin/bash
-
-cd ${top}V3_cuffquant_output
-mkdir ${serie}
-cd ${serie}
-module load Cufflinks
-cuffquant -p 18 --library-type ${lib} \
--o ${file::(-4)} \
-${top}V3_cuffmerge_output/${serie}/merged.gtf \
-${top}V3_hisat_output/${file}
-rm ${tmp}V3_quant_${file::(-4)}.sh" > ${tmp}V3_quant_${file::(-4)}.sh
-
-cd ${tmp}
-chmod 755 ${tmp}V3_quant_${file::(-4)}.sh
-rm ../slurm_logs/V3_quant_${file::(-4)}.*.out
-sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_quant_${file::(-4)}.%j.out ${tmp}V3_quant_${file::(-4)}.sh 2>&1 | tee ${tmp}V3_quant_${file::(-4)}.id
-sleep 2
-id=$(cat ${tmp}V3_quant_${file::(-4)}.id | grep 'Submitted batch job')
-echo -n :${id:20} >> ${tmp}V3_quant.ids
-rm ${tmp}V3_quant_${file::(-4)}.id
-done
+    cd ${top}V3_hisat_output
+    for file in $(ls *${serie}*.bam); do 
+        echo "#!/bin/bash
+        cd ${top}V3_cuffquant_output
+        mkdir ${serie}
+        cd ${serie}
+        module load Cufflinks
+        cuffquant -p 18 --library-type ${lib} \
+        -o ${file::(-4)} \
+        ${top}V3_cuffmerge_output/${serie}/merged.gtf \
+        ${top}V3_hisat_output/${file}
+        rm ${tmp}V3_quant_${file::(-4)}.sh
+        " > ${tmp}V3_quant_${file::(-4)}.sh
+        cd ${tmp}
+        chmod 755 ${tmp}V3_quant_${file::(-4)}.sh
+        rm ../slurm_logs/V3_quant_${file::(-4)}.*.out
+        id=(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_quant_${file::(-4)}.%j.out ${tmp}V3_quant_${file::(-4)}.sh)
+        sleep 2
+        ids=${ids}:${id:20}
+    done
 done
 
-quant_ids=$(cat ${tmp}V3_quant.ids)
-
-srun -p blade,himem,hugemem -d afterok${quant_ids} echo "Starting cuffdiff"
+srun -p blade,himem,hugemem -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
 
 
 #############################################################################
@@ -374,11 +323,11 @@ rm ${tmp}V3_diff_${serie}.sh" > ${tmp}V3_diff_${serie}.sh
 #### END section
 
 for serie in ${series}; do
-cd ${tmp}
-chmod 755 ${tmp}V3_diff_${serie}.sh
-rm ../slurm_logs/V3_diff_${serie}.*.out
-sbatch -p blade,himem,hugemem --mem=724gb --cpus-per-task=18 -o ../slurm_logs/V3_diff_${serie}.%j.out ${tmp}V3_diff_${serie}.sh
-sleep 2
+    cd ${tmp}
+    chmod 755 ${tmp}V3_diff_${serie}.sh
+    rm ../slurm_logs/V3_diff_${serie}.*.out
+    sbatch -p blade,himem,hugemem --mem=724gb --cpus-per-task=18 -o ../slurm_logs/V3_diff_${serie}.%j.out ${tmp}V3_diff_${serie}.sh
+    sleep 2
 done
 
 exit
