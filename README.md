@@ -6,11 +6,16 @@ This repository hosts scripts and tools for RNAseq analysis.
 
 #### build-ref.sh
 
-this is the script we use for downloading genome assemblies from ENSEMBL and 
+*Made for SLURM*
 
-build the respective indexes and folders structure.
+This is the script we use for downloading genome assemblies from ENSEMBL and 
+
+build the respective indexes and folders structure. 
  
- usage: ```build-ref.sh destination_folder```
+Usage: 
+```
+srun build-ref.sh destination_folder
+```
 
 
 
