@@ -4,7 +4,7 @@ This repository hosts scripts and tools for RNAseq analysis.
 
 ## Tools
 
-#### build-ref.sh
+#### ENSrefs
 
 *Made for SLURM*
 
@@ -13,7 +13,7 @@ build the respective indexes and folders structure.
  
 Usage: 
 ```
-srun build-ref.sh destination_folder
+srun ENSrefs destination_folder
 ```
 
 
