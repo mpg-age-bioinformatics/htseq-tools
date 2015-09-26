@@ -20,6 +20,8 @@ srun build-ref.sh destination_folder
 
 ### tuxedo-slurm.sh
 
+*Made for SLURM*
+
 This script runs a full RNAseq pipeline under a slurm jobs distribution system
 
 * fastQC - quality control 
@@ -34,6 +36,8 @@ This script runs a full RNAseq pipeline under a slurm jobs distribution system
 Please read the instructions inside the script for usage.
 
 ### tuxedo_v3-slurm.sh
+
+*Made for SLURM*
 
 This script runs a full RNAseq pipeline under a slurm jobs distribution system 
 using about 18 processes per file allowing full analysis of 20 libraries with 
