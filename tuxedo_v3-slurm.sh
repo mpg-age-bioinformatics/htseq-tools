@@ -18,7 +18,7 @@ S_XXX-F_XXXX-L_XXXXX-XXX-XXXX-REP_X-READ_x.fastq.gz
 Please notice that for paired samples, the S_XXX is the same.
 
 
-Make sure you have edited the last section of this script - cuffdiff - before you execute this script."
+Make sure you have edited the last section of this script - cuffdiff - before you execute this script." > /dev/null 2>&1
 
 
 #############################################################################
@@ -104,20 +104,22 @@ for serie in $series; do
         cp ${raw}${file} ${tmp}
         cd ${tmp}
         unpigz -p 4 ${file}
+        # FASTQC call
         fastqc -t 4 -o ../fastqc ${file::(-3)}
         rm ${tmp}fastqc_${file::(-9)}.sh
         " > ${tmp}fastqc_${file::(-9)}.sh
 
         cd ${tmp} 
         chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
-        rm ../slurm_logs/fastqc_${file::(-9)}.*.out
-        id=(sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh)d
+        rm ../slurm_logs/fastqc_${file::(-9)}.*.out > /dev/null 2>&1  
+        id=$(sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh)
         sleep 2
         ids=${ids}:${id:20}
     done
 done
 
-srun -p blade,himem,hugemem -d afterok${ids} echo "FASTQC done"
+echo "Wainting for FASTQC jobs${ids} to complete"
+srun -p blade,himem,hugemem -d afterok${ids} echo "FASTQC done. Starting Flexbar."
 
 #############################################################################
 
@@ -131,6 +133,9 @@ for serie in $series; do
             echo "#!/bin/bash 
             module load pigz
             module load Flexbar
+
+            # Flexbar call for paired end reads
+
             flexbar -r ${tmp}${file::(-10)}1.fastq \
             -p ${tmp}${file::(-10)}2.fastq -t ${top}raw_trimmed/${file::(-11)} \
             -n 18 -a ${adapters_file} \
@@ -144,6 +149,9 @@ for serie in $series; do
             echo "#!/bin/bash
             module load pigz
             module load Flexbar
+
+            # Flexbar call for single end reads
+
             flexbar -r ${tmp}${file::(-10)}1.fastq \
             -t ${top}raw_trimmed/${file::(-11)}_1 \
             -n 18 -a ${adapters_file} \
@@ -157,13 +165,14 @@ for serie in $series; do
 
     cd ${tmp}
     chmod 755 ${tmp}flexbar_${file::(-8)}sh
-    rm ../slurm_logs/flexbar_${file::(-8)}*.out
-    id=(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh)
+    rm ../slurm_logs/flexbar_${file::(-8)}*.out > /dev/null 2>&1  
+    id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh)
     sleep 2
     ids=${ids}:${id:20}    
     done
 done
 
+echo "Wainting for Flexbar jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "FLEXBAR done. Starting HiSat and StringTie"
 
 
@@ -174,7 +183,10 @@ ids=
 cd ${rawt}
 for serie in $series; do
     cd ${rawt}
-    for file in $(ls *${serie}*1.fastq.gz); do 
+    for file in $(ls *${serie}*1.fastq.gz); do
+        
+        # Libraries and paired end vs. single end settings for HISAT    
+ 
         if [[ $(contains "${SE_unstr[@]}" "$serie") == "y" ]]; then
             lib=
             files="-U ${file}"
@@ -201,16 +213,25 @@ for serie in $series; do
         cd ${rawt}
         module load Bowtie2
         module load HISAT
+
+        # HISAT call 
+
         hisat -p 18 ${lib} --met-file ${top}V3_hisat_output/${file::(-16)}.stats \
         -x ${hisat_index} -S ${top}V3_hisat_output/${file::(-16)}.sam \
         ${files}
 
         cd ${top}V3_hisat_output
         module load SAMtools
+        
+        # Use samtools to select mapped reads and sort them
+
         samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 - ${file::(-16)}
         mkdir ${top}V3_stringtie_output/${file::(-16)}
 
         module load StringTie
+
+        # StringTie call
+
         stringtie ${file::(-16)}.bam -o ${top}V3_stringtie_output/${file::(-16)}.gtf \
         -p 18 -G ${ori_GTF} -f 0.99 \
         -C ${top}V3_stringtie_output/${file::(-16)}_full_cov.gtf \
@@ -220,13 +241,14 @@ for serie in $series; do
 
         cd ${tmp}
         chmod 755 ${tmp}V3_HS_ST_${file::(-16)}.sh 
-        rm ../slurm_logs/V3_HS_ST_${file::(-16)}.*.out
-        id=(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_HS_ST_${file::(-16)}.%j.out ${tmp}V3_HS_ST_${file::(-16)}.sh)
+        rm ../slurm_logs/V3_HS_ST_${file::(-16)}.*.out > /dev/null 2>&1
+        id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_HS_ST_${file::(-16)}.%j.out ${tmp}V3_HS_ST_${file::(-16)}.sh)
         sleep 2
         ids=${ids}:${id:20}
     done
 done
 
+echo "Wainting for HISAT and StringTie jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "HiSat and StringTie done. Starting cuffmerge"
  
 #############################################################################
@@ -237,8 +259,10 @@ for serie in $series; do
     cd ${top}V3_stringtie_output
     mkdir full_coverage
     mv *_full_cov.gtf full_coverage
-    cd full_coverage
+    
+    # Select only transcripts which have full coverage
 
+    cd full_coverage
     for gtf in $(ls *${serie}*.gtf); do
         readlink -f ${gtf} >> ${tmp}V3_assemblies_${serie}.txt
     done
@@ -250,6 +274,9 @@ for serie in $series; do
 
     cd ${top}
     module load Cufflinks
+    
+    # Cuffmerge call
+
     srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 \
     -o ${cmout} --min-isoform-fraction 1.0 \
     -g ${ori_GTF} -s ${genome} ${tmp}V3_assemblies_${serie}.txt
@@ -263,6 +290,9 @@ cd ../scripts
 echo "Starting cuffquant"
 
 for serie in $series; do
+
+    # Library settings for cuffquant
+
     if [[ $(contains "${unstr[@]}" "$serie") == "y" ]]; then
         lib="fr-unstranded"
     elif [[ $(contains "${str[@]}" "$serie") == "y" ]]; then
@@ -278,6 +308,9 @@ for serie in $series; do
         mkdir ${serie}
         cd ${serie}
         module load Cufflinks
+
+        # Cuffquant call
+
         cuffquant -p 18 --library-type ${lib} \
         -o ${file::(-4)} \
         ${top}V3_cuffmerge_output/${serie}/merged.gtf \
@@ -286,13 +319,14 @@ for serie in $series; do
         " > ${tmp}V3_quant_${file::(-4)}.sh
         cd ${tmp}
         chmod 755 ${tmp}V3_quant_${file::(-4)}.sh
-        rm ../slurm_logs/V3_quant_${file::(-4)}.*.out
-        id=(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_quant_${file::(-4)}.%j.out ${tmp}V3_quant_${file::(-4)}.sh)
+        rm ../slurm_logs/V3_quant_${file::(-4)}.*.out > /dev/null 2>&1  
+        id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/V3_quant_${file::(-4)}.%j.out ${tmp}V3_quant_${file::(-4)}.sh)
         sleep 2
         ids=${ids}:${id:20}
     done
 done
 
+echo "Wainting for cuffquant jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
 
 
@@ -310,6 +344,9 @@ echo "#!/bin/bash
 cd ${qua}${serie}
 
 module load Cufflinks
+
+# Cuffdiff call
+
 cuffdiff -p 18 --library-type ${lib} \
 -L Fema_Y,Male_Y,Male_O \
 -o ${dout} --dispersion-method per-condition \
@@ -325,7 +362,7 @@ rm ${tmp}V3_diff_${serie}.sh" > ${tmp}V3_diff_${serie}.sh
 for serie in ${series}; do
     cd ${tmp}
     chmod 755 ${tmp}V3_diff_${serie}.sh
-    rm ../slurm_logs/V3_diff_${serie}.*.out
+    rm ../slurm_logs/V3_diff_${serie}.*.out > /dev/null 2>&1  
     sbatch -p blade,himem,hugemem --mem=724gb --cpus-per-task=18 -o ../slurm_logs/V3_diff_${serie}.%j.out ${tmp}V3_diff_${serie}.sh
     sleep 2
 done
