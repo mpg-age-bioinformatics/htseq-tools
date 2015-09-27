@@ -34,6 +34,8 @@ if [[ ! -d ${1} ]]; then mkdir -p ${1}; fi
 dest=$(readlink -f ${1}) 
 cd ${dest} 
 
+# Get list of organisms from ENSEMBL
+
 echo "* fetching organism list"
 available_organisms=$(curl -#l ftp://ftp.ensembl.org/pub/current_fasta/)
 echo "* available organisms:"
@@ -59,7 +61,7 @@ sep=_
 release=$releaseA$sep$releaseB 
 
 
-# ask user if latest relases should be intalled or and older one
+# ask user if latest relases should be intalled or an older one
 
 printf "* The latest realse is the $release, do you wish to add the (l)atest release or an (o)lder release? (l/o) "
 read answer1
