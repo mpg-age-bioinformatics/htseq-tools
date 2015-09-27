@@ -118,7 +118,7 @@ for serie in $series; do
     done
 done
 
-echo "Wainting for FASTQC jobs${ids} to complete"
+echo "Waiting for FASTQC jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "FASTQC done. Starting Flexbar."
 
 #############################################################################
@@ -172,7 +172,7 @@ for serie in $series; do
     done
 done
 
-echo "Wainting for Flexbar jobs${ids} to complete"
+echo "Waiting for Flexbar jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "FLEXBAR done. Starting HiSat and StringTie"
 
 
@@ -248,7 +248,7 @@ for serie in $series; do
     done
 done
 
-echo "Wainting for HISAT and StringTie jobs${ids} to complete"
+echo "Waiting for HISAT and StringTie jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "HiSat and StringTie done. Starting cuffmerge"
  
 #############################################################################
@@ -326,7 +326,7 @@ for serie in $series; do
     done
 done
 
-echo "Wainting for cuffquant jobs${ids} to complete"
+echo "Waiting for cuffquant jobs${ids} to complete"
 srun -p blade,himem,hugemem -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
 
 
