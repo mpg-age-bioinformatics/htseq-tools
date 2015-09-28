@@ -1,6 +1,6 @@
-# rnaseq-tools
+# HTSeq-tools
 
-This repository hosts scripts and tools for RNAseq analysis.
+This repository hosts scripts and tools for analysis of high throughput sequencing data.
 
 ## Tools
 
