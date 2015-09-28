@@ -1,0 +1,153 @@
+#!/usr/bin/env python
+
+import os
+import sys
+from os.path import expanduser
+import contextlib
+
+
+# import required packages if they don't exist, install them with pip
+try:
+    import openpyxl
+except ImportError:
+    import pip
+    pip.main(['install','--user','openpyxl==2.1.4']) 
+    import openpyxl
+
+if openpyxl.__version__ != '2.1.4':
+    import pip 
+    pip.main(['install','--user','openpyxl==2.1.4']) 
+
+try:
+    import pandas as pd
+except ImportError:
+    import pip
+    pip.main(['install', '--user', 'pandas'])
+    import pandas as pd
+
+try:
+    import numpy as np
+except ImportError:
+    import pip
+    pip.main(['install', '--user', 'numpy'])
+    import numpy as np
+
+
+
+# redirect some of the final pandas error/alternatives messages
+@contextlib.contextmanager
+def nostderr():
+    savestderr = sys.stderr
+    class Devnull(object):
+        def write(self, _): pass
+        def flush(self): pass
+    sys.stderr = Devnull()
+    try:
+        yield
+    finally:
+        sys.stderr = savestderr
+
+# interactive input from the user
+raw_data_folder_user = raw_input('Please create a folder and locate all raw data files inside.\nPlease remove any other files from that folder.\
+                                 \nPlease type in the location of you folder eg. Desktop/raw_data_21022015 or Documents/SNPs :\n')
+output_user=raw_input('Please type the location of the destination folder eg. Desktop/Results :\n')
+SNP_fract=raw_input('Please give in the unique number of times a SNP should be present (eg. 4 for not more than 4 times) :\n')
+SAMPLES_fract=raw_input('How many times shall a gene be detected after the uniqueness filter for it to be of interest? eg. 3\n')
+
+SNP_fract=int(SNP_fract)
+SAMPLES_fract=int(SAMPLES_fract)
+
+
+home=expanduser("~")
+raw_data_folder=home +"/"+raw_data_folder_user+"/"
+output=home +"/"+output_user+"/"
+
+if not os.path.exists(output):
+    os.makedirs(output)
+
+raw_files=os.listdir(raw_data_folder)
+raw_files=[ f for f in raw_files if ".DS_Store" not in f] 
+print "Found the following raw files:\n"
+for i in raw_files:
+    print i
+
+df_final=pd.DataFrame(columns=['# Chromo', 'Position', 'Reference', 'Change', 'Change_type', 'Homozygous', 'Effect', 'Quality', 'Coverage', 'Warnings', 'Gene_ID', 'Gene_name', 'Bio_type'])
+
+
+# Merge all raw files
+print "\nMerging raw files"
+for f in raw_files:
+    print "File: "+str(f)
+    df=pd.read_table(raw_data_folder+f,skiprows=2)
+    df=df.drop_duplicates(subset=['# Chromo','Position','Reference', 'Change','Change_type','Gene_name'])
+    df=df[['# Chromo', 'Position','Reference','Change','Change_type','Homozygous','Effect','Quality','Coverage','Warnings','Gene_ID', 'Gene_name', 'Bio_type']]
+    df_final=pd.merge(df_final, df, suffixes=('','_'+f) , how='outer',on=['# Chromo', 'Position', 'Effect', 'Change', 'Change_type', 'Gene_ID', 'Gene_name', 'Bio_type'])
+
+    
+df_final.drop(['Homozygous', 'Quality', 'Coverage', 'Warnings'],axis=1, inplace=True)
+print "Raw files merged"
+cols=df_final.columns.tolist()
+cov_cols=[ss for ss in cols if 'Coverage' in ss]
+df_cov=df_final[cov_cols]
+
+fract=SNP_fract+1
+# Drop SNPs based on number of samples that should have SNP
+df_cov=df_cov.dropna(thresh=fract)
+df_cov_i=df_cov.index.values
+print "Number of discarded SNPs"
+print len(df_cov_i)
+df_rel=df_final[~df_final.index.isin(df_cov_i)]
+print "Number of relevant SNPs"
+print len(df_rel)
+
+genes=list(set(df_rel['Gene_ID'].tolist()))
+goi=[]
+print "Genes of interest:"
+for g in genes:
+    # Drop genes based on number of times a gene should happear
+    df_tmp=df_rel[df_rel['Gene_ID']==g]
+    if len(df_tmp) >= SAMPLES_fract:
+        goi.append(g)
+        print g
+print "Number of relevant genes: "+str(len(goi))
+
+with nostderr():
+    # Produce final table with all SNPs for filtered genes
+    df_end=df_final[df_final['Gene_ID'].isin(goi)]
+    df_end.sort(columns=['Gene_ID'], inplace=True)
+    cols=df_end.columns.tolist()
+    final_cols=['# Chromo', 'Position', 'Reference', 'Change', 'Change_type','Effect','Gene_ID', 'Gene_name', 'Bio_type']
+    for r in raw_files:
+        tmp=[ss for ss in cols if r in ss]
+        tmp=[ss for ss in tmp if 'Homozygous' not in ss]# remove 'Homozygous' info
+        for t in tmp:
+            final_cols.append(t)
+
+    df_end=df_end[final_cols]
+
+    # Produce final table with filtered SNPs and filtered genes
+    df_end2=df_rel[df_rel['Gene_ID'].isin(goi)]
+    df_end2.sort(columns=['Gene_ID'], inplace=True)
+    cols=df_end2.columns.tolist()
+    final_cols=['# Chromo', 'Position', 'Reference', 'Change', 'Change_type','Effect','Gene_ID', 'Gene_name', 'Bio_type']
+    for r in raw_files:
+        tmp=[ss for ss in cols if r in ss]
+        tmp=[ss for ss in tmp if 'Homozygous' not in ss]# remove 'Homozygous' info
+        for t in tmp:
+            final_cols.append(t)
+
+    df_end2=df_end2[final_cols]
+
+    if len(df_end) > 0:
+        writer = pd.ExcelWriter(output+"SNPs_table.xlsx")
+        df_end.to_excel(writer, str(SAMPLES_fract)+" SNPs gene, "+str(SNP_fract)+" samp SNP", index=False)
+        df_end2.to_excel(writer, str(SAMPLES_fract)+" SNPs gene, "+str(SNP_fract)+" samp SNP; short", index=False)
+        writer.save()
+
+    else:
+        print "No genes found that match your criteria"
+
+print "Done!\nYou can find a summary table in "+output_user+"/SNPs_table.xlsx"
+print "\nContact: jorge.boucas@age.mpg.de"
+
+sys.exit()
