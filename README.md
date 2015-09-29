@@ -16,7 +16,15 @@ Usage:
 srun ENSrefs destination_folder
 ```
 
+#### getChromosome
 
+This script allows you to recover generate a fasta file for chromosome contained in a multifasta file.
+
+Usage:
+```
+getChromosome -h
+getChromosome -i GRCm38.dna.primary_assembly.fa -o output_folder -c 2
+```
 
 ### tuxedo-slurm.sh
 
