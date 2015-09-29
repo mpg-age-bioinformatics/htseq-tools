@@ -18,7 +18,7 @@ srun ENSrefs destination_folder
 
 #### getChromosome
 
-This script allows you to recover generate a fasta file for chromosome contained in a multifasta file.
+This script allows you to generate a fasta file for a chromosome contained in a multifasta file.
 
 Usage:
 ```
