@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import os
+import argparse
+import sys
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-i", "--multifasta", help="multifasta file")
+parser.add_argument("-o", "--output_folder", help="Output folder")
+parser.add_argument("-c", "--chromosome", help="Graphics label")
+args = parser.parse_args()
+
+multifasta=os.path.realpath(str(args.multifasta))
+output=os.path.realpath(str(args.output_folder))+"/"
+c=str(args.chromosome)
+
+def write_fasta(chrom,fasta_in,output_folder):
+    with open(fasta_in, 'r+') as f:
+        sys.stdout.flush()
+        lines = f.readlines()
+        for i in range(0, len(lines)):
+            line = lines[i]
+            if line[0] == ">":
+                print line
+                sys.stdout.flush()
+                fChr=line.split(" ")[0]
+                fChr=fChr[1:]
+                if fChr == chrom:
+                    print line
+                    sys.stdout.flush()
+                    seq=str("")
+                    s=i
+                    code=['N','A','C','T','G']
+                    firstbase=lines[s+1][0]
+                    f2=open(output_folder+chrom+".fa",'w')
+                    f2.write(line)
+                    while firstbase in code:
+                        s=s + 1
+                        seq=seq+lines[s]
+                        firstbase=lines[s+1][0]
+                    f2.write(seq)
+                    print seq
+                    sys.stdout.flush()
+                    f2.close
+                    
+write_fasta(c,multifasta,output)
