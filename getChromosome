@@ -10,6 +10,8 @@ parser.add_argument("-c", "--chromosome", help="Graphics label")
 args = parser.parse_args()
 
 multifasta=os.path.realpath(str(args.multifasta))
+if not os.path.exists(str(args.output_folder)):
+    os.makedirs(str(args.output_folder))
 output=os.path.realpath(str(args.output_folder))+"/"
 c=str(args.chromosome)
 
