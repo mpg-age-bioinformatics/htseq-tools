@@ -99,7 +99,7 @@ Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder
 
 #### SNPsFilter
 
-This executable interactive python scripts lets you merge *.tabular files outputed by [CloudMap](http://usegalaxy.org/cloudmap) and filter SNPs of interest based on the maximum number of samples containing the SNP and minium number of SNPs per gene.
+This executable interactive python scripts lets you merge *.tabular files outputed by [CloudMap](http://usegalaxy.org/cloudmap) and filter SNPs of interest based on the maximum number of samples containing the SNP and minimum number of SNPs per gene.
 
 Usage:
 
