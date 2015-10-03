@@ -23,6 +23,7 @@ This script allows you to generate a fasta file for a chromosome contained in a 
 Usage:
 ```
 getChromosome -h
+# For >2 dna:chromosome chromosome:GRCm38:2:1:182113224:1 REF use:
 getChromosome -i GRCm38.dna.primary_assembly.fa -o output_folder -c 2
 ```
 
