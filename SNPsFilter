@@ -81,7 +81,7 @@ for f in raw_files:
     df=pd.read_table(raw_data_folder+f,skiprows=2)
     df=df.drop_duplicates(subset=['# Chromo','Position','Reference', 'Change','Change_type','Gene_name'])
     df=df[['# Chromo', 'Position','Reference','Change','Change_type','Homozygous','Effect','Quality','Coverage','Warnings','Gene_ID', 'Gene_name', 'Bio_type']]
-    df_final=pd.merge(df_final, df, suffixes=('','_'+f) , how='outer',on=['# Chromo', 'Position', 'Effect', 'Change', 'Change_type', 'Gene_ID', 'Gene_name', 'Bio_type'])
+    df_final=pd.merge(df_final, df, suffixes=('','_'+f) , how='outer',on=['# Chromo', 'Position','Reference','Effect', 'Change', 'Change_type', 'Gene_ID', 'Gene_name', 'Bio_type'])
 
     
 df_final.drop(['Homozygous', 'Quality', 'Coverage', 'Warnings'],axis=1, inplace=True)
