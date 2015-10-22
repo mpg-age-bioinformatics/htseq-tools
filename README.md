@@ -16,6 +16,17 @@ Usage:
 srun ENSrefs destination_folder
 ```
 
+#### CCG
+
+this script takes a wget command from CCG donwload instructions, <br />
+ downloads the respective files to a destination <br />
+ of choice checking file integrity afterwards.<br />
+
+usage: 
+```
+CCG -l "wget ..." -o destination_folder
+```
+
 #### getChromosome
 
 This script allows you to generate a fasta file for a chromosome contained in a multifasta file.
