@@ -129,6 +129,7 @@ cd ${raw}
 for serie in $series; do
     cd ${raw}
     for file in $(ls *${serie}*1.fastq.gz); do
+        cd ${raw}
         if [[ -e ${file::(-10)}2.fastq.gz ]]; then
             echo "#!/bin/bash 
             module load pigz
