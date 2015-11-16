@@ -6,7 +6,7 @@ This repository hosts scripts and tools for analysis of high throughput sequenci
 
 #### ENSrefs
 
-*Made for SLURM*
+*Made for SLURM & Environment Modules Project*
 
 This is the script we use for downloading genome assemblies from ENSEMBL and 
 build the respective indexes and folders structure. 
@@ -39,7 +39,7 @@ getChromosome -i GRCm38.dna.primary_assembly.fa -o output_folder -c 2
 
 ### tuxedo-slurm.sh
 
-*Made for SLURM*
+*Made for SLURM & Environment Modules Project*
 
 This script runs a full RNAseq pipeline under a slurm jobs distribution system
 
@@ -56,7 +56,7 @@ Please read the instructions inside the script for usage.
 
 ### tuxedo_v3-slurm.sh
 
-*Made for SLURM*
+*Made for SLURM & Environment Modules Project*
 
 This script runs a full RNAseq pipeline under a slurm jobs distribution system 
 using about 18 processes per file allowing full analysis of 20 libraries with 
