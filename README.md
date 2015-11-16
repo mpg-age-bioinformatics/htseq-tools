@@ -6,7 +6,7 @@ This repository hosts scripts and tools for analysis of high throughput sequenci
 
 #### ENSrefs
 
-*Made for SLURM & Environment Modules Project*
+*Made for SLURM*
 
 This is the script we use for downloading genome assemblies from ENSEMBL and 
 build the respective indexes and folders structure. 
