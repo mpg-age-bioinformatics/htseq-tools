@@ -238,7 +238,7 @@ for serie in $series; do
         -C ${top}stringtie_output/${file::(-16)}_full_cov.gtf \
         -b ${top}stringtie_output/${file::(-16)} 
         rm ${tmp}HS_ST_${file::(-16)}.sh
-        " > ${tmp}V3_HS_ST_${file::(-16)}.sh
+        " > ${tmp}HS_ST_${file::(-16)}.sh
 
         cd ${tmp}
         chmod 755 ${tmp}HS_ST_${file::(-16)}.sh 
