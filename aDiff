@@ -430,7 +430,7 @@ else:
     print "Imported list of differentially regulated genes"
     sys.stdout.flush()
 
-    gtf = pd.read_table(original_gtf, sep='\t', skiprows=6, header=None, dtype=str)
+    gtf = pd.read_table(original_gtf, sep='\t', comment="#", header=None, dtype=str)
     print "GTF imported"
     sys.stdout.flush()
     gtf = gtf.astype(str)
