@@ -98,6 +98,16 @@ genes.PCA.rep
 dev.off()
 rm(genes.PCA.rep)
 
+cond.PCoA <- MDSplot(genes(cuff))
+pdf(paste(output,"/cond.PCoA.pdf",sep=""))
+cond.PCoA
+dev.off()
+
+cond.PCoA.rep <- MDSplot(genes(cuff), replicates = T)
+pdf(paste(output,"/cond.PCoA.rep.pdf",sep=""))
+cond.PCoA.rep
+dev.off()
+
 mySigGeneIds<-getSig(cuff,alpha=0.05,level='genes')
 mySigGenes<-getGenes(cuff,mySigGeneIds)
 
