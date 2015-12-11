@@ -1,0 +1,422 @@
+#!/bin/bash
+
+# This script builds the references and annotations folder for each selected organism and selected release. 
+# eg. caenorhabditis_elegans release: WBcell235.78
+# Level1 folder = caenorhabditis_elegans
+# Level2 folder = WBcell235_78
+# reference genome (fasta and index) = WBcel235.dna.toplevel
+# reference GTF = WBcel235.78.gtf
+# reference GTF index = caenorhabditis_elegans/WBcell235_78/GTF_index/
+# cuffcompare fixed GTF = cuffcmp_GTF.WBcel235.78.gtf
+# other cuffcompare output files = cuffcmp.results.tar.bz2
+# cuffcompare fixed GTF index = caenorhabditis_elegans/WBcell235_78/GTF_cuffcmp_GTF_index/
+# chromosomes fasta = caenorhabditis_elegans/WBcell235_78/fasta
+
+# example tophat options: 
+# --transcriptome-index $references_directory/caenorhabditis_elegans/WBcell235_78/GTF_cuffcmp_GTF_index 
+# for the reference indexed genome use $references_directory/caenorhabditis_elegans/WBcell235_78/bowtie2/WBcel235.dna.toplevel
+
+# example cufflinks options:
+# -g $references_directory/caenorhabditis_elegans/WBcell235_78/cuffcmp_GTF.WBcel235.78.gtf
+
+# example cuffcompare options:
+# -s $references_directory/caenorhabditis_elegans/WBcell235_78/chromosomes  
+
+### functions
+
+get_organism () {
+  curl -#l ftp://ftp.ensembl.org/pub/current_fasta/
+  # atlernative: ncftpls -l ftp://ftp.ensembl.org/pub/current_fasta/
+}
+
+get_releases () {
+  curl -#l ftp://ftp.ensembl.org/pub/ | grep release | sed 's|release-||' | sort
+}
+
+get_current () {
+  echo "* getting latest release"
+  gtf=$(curl -#l ftp://ftp.ensembl.org/pub/current_gtf/$1/ | grep gtf.gz | uniq)
+  relA=$(echo $gtf | cut -f2 -d.)
+  relB=$(echo $gtf | cut -f3 -d.)
+  sep=_
+  rel=$relA$sep$relB 
+  echo $rel
+}
+
+### variables and options
+
+unset LIST
+unset RELEASE
+unset ORGANISM
+BIN=$(basename $0)
+BASE="/beegfs/common/genomes"
+VER_STAR="2.4.1d"
+USAGE="USAGE:
+  $BIN [OPTIONS]
+OPTIONS:
+  -l                  : return available organisms
+  -b PATH             : select the base directory, (default: $BASE)
+  -o ORGANISM         : define organism, e.g. 'caenorhabditis_elegans'
+  -r RELEASE          : define release version, e.g. XX_YY 
+                        (default: automatic detection of current version)
+  --ver-star VERSION  : version of STAR (default $VER_STAR)
+"
+
+while [[ $# -gt 0 ]]
+do
+  case $1 in
+    -h)
+      echo "$USAGE"
+      exit
+      ;;
+    -l)
+      LIST=true
+      ;;
+    -b)
+      BASE=$2
+      shift
+      ;;
+    -o)
+      ORGANISM=$2
+      shift
+      ;;
+    -r)
+      RELEASE=$2
+      shift
+      ;;
+    --version-star)
+      VER_STAR=$2
+      shift
+      ;;
+  esac
+  shift
+done
+
+### check base folder
+
+if [[ ! -d $BASE || ! -x $BASE || ! -w $BASE ]]
+then
+  echo "error: base directory '$BASE' not found/accessable/writeable"
+  exit 65
+fi
+
+### check software
+
+module unload STAR
+VER_STAR_ERROR=$(module load STAR/$VER_STAR 2>&1)
+if [[ -n $VER_STAR_ERROR ]]
+then
+  echo "error: STAR module version '$STAR_VER' not available"
+  exit 65
+fi
+
+### check organism
+
+echo "* fetching organism list"
+ORGANISMS=($(get_organism))
+echo "* fetching release list"
+RELEASES=($(get_releases))
+CURRENT=${RELEASES[${#RELEASES[@]}-1]}
+
+if [[ $LIST ]]
+then
+  echo
+  echo "* available organisms:"
+  printf '%s\n' "${ORGANISMS[@]}" | column
+  echo
+  echo "* available releases:"
+  printf '%s\n' "${RELEASES[@]}" | column
+  echo
+  exit
+fi
+
+if [[ -z $ORGANISM || -z $(echo ${ORGANISMS[@]} | grep $ORGANISM) ]]
+then
+  echo "* error: organism '$ORGANISM' not available"
+  exit 65
+fi
+
+### check release
+
+if [[ ! $RELEASE ]]
+then
+  RELEASE=$CURRENT
+fi
+
+if [[ -z $RELEASE || -z $(echo ${RELEASES[@]} | grep -o $RELEASE) ]]
+then
+  echo "Error: release '$RELEASE' not available"
+  exit 65
+fi
+
+URL_GTF="ftp://ftp.ensembl.org/pub/release-$RELEASE/gtf/$ORGANISM/"
+URL_DNA="ftp://ftp.ensembl.org/pub/release-$RELEASE/fasta/$ORGANISM/dna/"
+TARGET=$BASE/$ORGANISM/$RELEASE
+
+### notify
+
+echo "* settings:
+  ORG : $ORGANISM
+  REL : $RELEASE (current: $CURRENT)
+  URL : $URL_GTF
+  DIR : $TARGET
+"
+
+### generate target directory
+
+if [[ -d $TARGET ]]
+then
+  echo "warning: target directory '$TARGET' exists"
+  #echo "error: target directory '$TARGET' exists"
+  #exit 65
+fi
+mkdir -p $TARGET
+if [[ ! -x $TARGET || ! -w $TARGET ]]
+then
+  echo "error: target directory '$TARGET' not accessable/writeable"
+  exit 65
+fi
+cd $TARGET
+
+### download and extract
+
+echo "* fetching file lists"
+FILES_GTF=($(curl -#l $URL_GTF | grep "\.gtf\.gz$"))
+FILES_DNA=($(curl -#l $URL_DNA | grep "\.dna\."))
+BUILD=${FILES_GTF[0]#*.}
+BUILD=${BUILD%%.*}
+touch BUILD_${BUILD}_RELEASE_${RELEASE}
+
+echo "* downloading and extracting"
+for FILE in ${FILES_GTF[@]}
+do
+  FILE_UNZIP=${FILE%%.gz}
+  FILE_REBASED=original.${FILE_UNZIP#*.*.*.}
+  echo "  ${FILE%%.gz} : "
+  #[[ -f $FILE_UNZIP ]] && echo "exists" && continue
+  [[ -f $FILE_REBASED ]] && echo "exists" && continue
+  curl -#O $URL_GTF/$FILE
+  srun gunzip $FILE
+  mv $FILE_UNZIP $FILE_REBASED
+done
+
+mkdir -p chromosomes
+for FILE in ${FILES_DNA[@]}
+do
+  FILE_UNZIP=${FILE%%.gz}
+  FILE_CHROM=chromosomes/${FILE_UNZIP##*chromosome.}
+  FILE_REBASED=original.${FILE_UNZIP#*.*.*.}
+  echo "  ${FILE_UNZIP} : "
+  [[ -f ${FILE_REBASED} || -f ${FILE_CHROM} ]] && echo "exists" && continue
+  [[ $FILE =~ nonchromosomal && -f chromosomes/nonchromosomal.fa ]] && echo "exists" && continue
+  curl -#O $URL_DNA/$FILE
+  srun gunzip $FILE
+  if [[ $FILE =~ chromosome ]]
+  then
+    mv $FILE_UNZIP $FILE_CHROM
+  elif [[ $FILE =~ nonchromosomal ]]
+  then
+    mv $FILE_UNZIP chromosomes/nonchromosomal.fa
+  else
+    mv $FILE_UNZIP $FILE_REBASED
+  fi
+done
+
+### align
+
+# original.toplevel.fa original.primary_assembly.fa
+mkdir -p log
+
+for gtf in original.gtf
+do
+  for fa in original.*.fa
+  do
+    original=$fa
+    label=${fa#original.}
+    label=${label%.fa}
+    
+    #######
+    ### bowtie2
+    #######
+  
+    name=${label}_bowtie2
+    if [[ -d $name ]]
+    then
+      echo "warning: skipped $name, remove folder to rebuid"
+    else
+      echo "* building $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load Bowtie2
+date
+which bowtie2-build-s
+bowtie2-build-s index.fa index.fa
+mkdir $name
+cd $name
+ln -s ../$fa index.fa
+echo done
+"
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+    fi
+  
+    #######
+    ### bwa
+    #######
+  
+    name=${label}_bwa
+    if [[ -d $name ]]
+    then
+      echo "warning: skipped $name, remove folder to rebuid"
+    else
+      echo "* building $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load BWA
+date
+which bwa
+mkdir $name
+cd $name
+ln -s ../$fa index.fa
+bwa index -a bwtsw -p index.fa index.fa
+echo done
+"
+  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      pid_bowtie2=$(sbatch -o log/${name}.out -J $jobname log/${name}.sh)
+      pid_bowtie2=${pid_bowtie2##* }
+    fi
+  
+    #######
+    ### star
+    #######
+  
+    name=${label}_star_$VER_STAR
+    if [[ -d $name ]]
+    then
+      echo "warning: skipped $name, remove folder to rebuid"
+    else
+      echo "* building $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load STAR/$VER_STAR
+date
+which STARshort
+mkdir $name
+cd $name
+ln -s ../$fa index.fa
+ln -s ../$gtf index.fa.gtf
+STARshort --runMode genomeGenerate --genomeDir $name --genomeFastaFiles $fa \
+  --runThreadN 8 --sjdbGTFfile index.fa.gtf --sjdbOverhang 100 --limitGenomeGenerateRAM 90543555797
+echo done
+  "
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      sbatch -o log/${name}.out -J $jobname -n 8 --mem=100GB log/${name}.sh
+    fi
+
+    #######
+    ### hisat
+    #######
+  
+    name=${label}_hisat
+    if [[ -d $name ]]
+    then
+      echo "warning: skipped $name, remove folder to rebuid"
+    else
+      echo "* building $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load HISAT
+date
+which hisat
+mkdir $name
+cd $name
+ln -s ../$fa index.fa
+hisat-build index.fa index.fa
+echo done
+"
+  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+    fi
+  
+    #######
+    ### tophat2_cuffcompare
+    #######
+  
+    name=${label}_tophat2_cuffcompare
+    if [[ -d $name ]]
+    then
+      echo "warning: skipped $name, remove folder to rebuid"
+    else
+      echo "* building $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load Cufflinks
+module load Bowtie2
+module load TopHat
+date
+which cuffcompare
+which tophat2
+mkdir $name
+cuffcompare -V -CG -s chromosomes -r $gtf $gtf 2>&1
+mv cuffcmp.combined.gtf cuffcompare.gtf
+tar -jcvf cuffcmp.results.tar.bz2 cuffcmp.* --remove-files
+tophat2 -G cuffcompare.gtf --transcriptome-index ${name}/index ${label}_bowtie2/index.fa 2>&1
+rm -r tophat_out
+echo done
+"
+  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      if [[ -n $pid_bowtie2 ]]
+      then
+        sbatch -o log/${name}.out -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
+      else
+        sbatch -o log/${name}.out -J $jobname log/${name}.sh
+      fi
+    fi
+  
+    #######
+    ### tophat2
+    #######
+
+    name=${label}_tophat2
+    if [[ -d $name ]]
+    then
+      echo "warning: skipped $name, remove folder to rebuid"
+    else
+      echo "* building $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load Bowtie2
+module load TopHat
+date
+which bowtie2
+which tophat2
+tophat2 -G original.gtf --transcriptome-index $name ${label}_bowtie2/index.fa 2>&1
+echo done
+  "
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+    fi
+
+
+  done
+done
+
+### done
+
+echo "* done"
+
