@@ -607,7 +607,7 @@ for sig, label in zip(sig_choice,label_choice):
             df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
-                gtf = pd.read_table(merged_fixed_gtf, sep='\t', skiprows=6, header=None)
+                gtf = pd.read_table(merged_fixed_gtf, sep='\t', comment="#", header=None, dtype=str)
                 t_id = retrieve_GTF_field('transcript_id',gtf)    
                 n_ref = retrieve_GTF_field('nearest_ref',gtf)
 
