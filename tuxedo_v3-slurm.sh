@@ -56,7 +56,7 @@ echo "Creating required folders"
 mkdir ../slurm_logs
 mkdir ../fastqc_output
 mkdir ../tmp
-mkdir ../fleaxbar_output
+mkdir ../flexbar_output
 mkdir ../hisat_output
 mkdir ../stringtie_output
 mkdir ../cuffmerge_output
@@ -290,6 +290,8 @@ cd ../scripts
 
 echo "Starting cuffquant"
 
+ids=
+
 for serie in $series; do
 
     # Library settings for cuffquant
@@ -302,7 +304,7 @@ for serie in $series; do
         lib="fr-unstranded"
     fi
 
-    cd ${top}V3_hisat_output
+    cd ${top}hisat_output
     for file in $(ls *${serie}*.bam); do 
         echo "#!/bin/bash
         cd ${top}cuffquant_output
