@@ -18,7 +18,7 @@ parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-la
 parser.add_argument("--TSV", help="For p values > = 1 write tables as tab separated values", action="store_true")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
-parser.add_argument("--mart", help="Your mart of choice. Default='ensembl'", default='ensembl')
+parser.add_argument("--mart", help="Your mart of choice. Default='ensembl'", default='ENSEMBL_MART_ENSEMBL')
 parser.add_argument("--listDatasets", help="List datasets for your mart", action="store_true")
 parser.add_argument("--dataset", help="Dataset of your choice. Default='celegans_gene_ensembl'", default='celegans_gene_ensembl')
 parser.add_argument("--listFilters", help="List available filters", action="store_true")
@@ -287,26 +287,26 @@ def DAVID_get(cat, filtered_table, all_genes_table):
 
 if args.listMarts:
     biomaRt = importr("biomaRt")
-    print(biomaRt.listMarts())
+    print(biomaRt.listMarts(host='www.ensembl.org'))
     sys.exit(0)
 
 if args.listDatasets:
     biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
+    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
     print(biomaRt.listDatasets(ensemblMart))
     sys.exit(0)
 
 if args.listFilters:
     biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart, host='www.ensembl.org')
     print(biomaRt.listFilters(ensembl))
     sys.exit(0)
 
 if args.listAttributes:
     biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
+    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart, host='www.ensembl.org')
     print(biomaRt.listAttributes(ensembl))
     sys.exit(0)
 
@@ -471,7 +471,7 @@ else:
     print "\nRetrieving biotypes and gene ontoloy information"
     sys.stdout.flush()
     biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart)
+    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
     ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
     biotypes=biomaRt.getBM(attributes=data_output_biotypes, filters=data_filter, values=genes, mart=ensembl)
     goterms=biomaRt.getBM(attributes=data_output_goterms, filters=data_filter, values=genes, mart=ensembl)
