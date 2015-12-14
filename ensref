@@ -365,6 +365,35 @@ echo done
       chmod u+x log/${name}.sh
       sbatch -o log/${name}.out -J $jobname log/${name}.sh
     fi
+
+
+    #######
+    ### hisat2
+    #######
+  
+    name=${label_fa}_hisat2
+    if [[ -d $name ]]
+    then
+      echo "* indexing $name: skipped (remove folder to rebuild)"
+    else
+      echo "* indexing $name"
+      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+      cmd="#!/bin/bash
+module purge
+module load hisat2
+date
+which hisat2
+mkdir $name
+cd $name
+ln -s ../$fa index.fa
+hisat2-build index.fa index.fa
+echo done
+"
+  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
+      echo "$cmd" > log/${name}.sh
+      chmod u+x log/${name}.sh
+      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+    fi
   
     #######
     ### tophat2_cuffcompare
