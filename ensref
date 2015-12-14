@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# ensref - build and index genome data bases from ensembl
+#
+# base folder: 
+# - /<base directory>/<organism name>/<release number>/
+# base files:
+# - BUILD_XX_RELEASE_YY = build and release version info, empty file
+# - original.gtf = original reference gtf file
+# - original.*.gtf = varying reference gtf file
+# - original.*.fa = dna sequences fasta files (e.g. toplevel, ...)
+# - cuffcompare.gtf = original.gtf annotated with tophat/cuffcompare
+# index files:
+# <dna reference level>_<aligner>, e.g.
+# toplevel_tophat2/index.fa = tophat2 index base name
+# toplevel_tophat2_cuffcompare/index.fa = tophat2/cuffcompare index base name
+
 # This script builds the references and annotations folder for each selected organism and selected release. 
 # eg. caenorhabditis_elegans release: WBcell235.78
 # Level1 folder = caenorhabditis_elegans
@@ -166,9 +181,7 @@ echo "* settings:
 
 if [[ -d $TARGET ]]
 then
-  echo "warning: target directory '$TARGET' exists"
-  #echo "error: target directory '$TARGET' exists"
-  #exit 65
+  echo "* target directory '$TARGET' exists"
 fi
 mkdir -p $TARGET
 if [[ ! -x $TARGET || ! -w $TARGET ]]
@@ -229,22 +242,26 @@ mkdir -p log
 
 for gtf in original.gtf
 do
+  # if adding more gtfs, PREpend label to $name
+  # e.g.
+  # label_gtf=${gtf#original.}
+  # label_gtf=${label_gtf%.gtf}
+  # [[ -z $label_gtf ]] && label_gtf="default"
   for fa in original.*.fa
   do
-    original=$fa
-    label=${fa#original.}
-    label=${label%.fa}
+    label_fa=${fa#original.}
+    label_fa=${label_fa%.fa}
     
     #######
     ### bowtie2
     #######
   
-    name=${label}_bowtie2
+    name=${label_fa}_bowtie2
     if [[ -d $name ]]
     then
-      echo "warning: skipped $name, remove folder to rebuid"
+      echo "* indexing $name: skipped (remove folder to rebuild)"
     else
-      echo "* building $name"
+      echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 module purge
@@ -266,12 +283,12 @@ echo done
     ### bwa
     #######
   
-    name=${label}_bwa
+    name=${label_fa}_bwa
     if [[ -d $name ]]
     then
-      echo "warning: skipped $name, remove folder to rebuid"
+      echo "* indexing $name: skipped (remove folder to rebuild)"
     else
-      echo "* building $name"
+      echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 module purge
@@ -295,11 +312,12 @@ echo done
     ### star
     #######
   
-    name=${label}_star_$VER_STAR
+    name=${label_fa}_star_$VER_STAR
     if [[ -d $name ]]
     then
-      echo "warning: skipped $name, remove folder to rebuid"
+      echo "* indexing $name: skipped (remove folder to rebuild)"
     else
+      echo "* indexing $name"
       echo "* building $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
@@ -308,28 +326,28 @@ module load STAR/$VER_STAR
 date
 which STARshort
 mkdir $name
-cd $name
-ln -s ../$fa index.fa
-ln -s ../$gtf index.fa.gtf
+ln -s ../$fa $name/index.fa
+ln -s ../$gtf $name/index.fa.gtf
 STARshort --runMode genomeGenerate --genomeDir $name --genomeFastaFiles $fa \
-  --runThreadN 8 --sjdbGTFfile index.fa.gtf --sjdbOverhang 100 --limitGenomeGenerateRAM 90543555797
+  --runThreadN 12 --sjdbGTFfile index.fa.gtf --sjdbOverhang 100 \
+  --limitGenomeGenerateRAM 90543555797
 echo done
   "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.out -J $jobname -n 8 --mem=100GB log/${name}.sh
+      sbatch -o log/${name}.out -J $jobname -n 12 --mem=100GB log/${name}.sh
     fi
 
     #######
     ### hisat
     #######
   
-    name=${label}_hisat
+    name=${label_fa}_hisat
     if [[ -d $name ]]
     then
-      echo "warning: skipped $name, remove folder to rebuid"
+      echo "* indexing $name: skipped (remove folder to rebuild)"
     else
-      echo "* building $name"
+      echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 module purge
@@ -352,12 +370,12 @@ echo done
     ### tophat2_cuffcompare
     #######
   
-    name=${label}_tophat2_cuffcompare
+    name=${label_fa}_tophat2_cuffcompare
     if [[ -d $name ]]
     then
-      echo "warning: skipped $name, remove folder to rebuid"
+      echo "* indexing $name: skipped (remove folder to rebuild)"
     else
-      echo "* building $name"
+      echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 module purge
@@ -370,9 +388,16 @@ which tophat2
 mkdir $name
 cuffcompare -V -CG -s chromosomes -r $gtf $gtf 2>&1
 mv cuffcmp.combined.gtf cuffcompare.gtf
-tar -jcvf cuffcmp.results.tar.bz2 cuffcmp.* --remove-files
-tophat2 -G cuffcompare.gtf --transcriptome-index ${name}/index ${label}_bowtie2/index.fa 2>&1
-rm -r tophat_out
+tar -jcvf cuffcompare.results.tar.bz2 cuffcmp.* --remove-files
+tophat2 -o ${name}.tmp -G cuffcompare.gtf --transcriptome-index ${name}/index \
+  ${label_fa}_bowtie2/index.fa 2>&1
+rm -r ${name}.tmp
+cd $name
+for f in *
+do
+  [[ \$f =~ ^index\.fa ]] && continue
+  mv \$f \${f/#index/index.fa}
+done
 echo done
 "
   #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
@@ -390,12 +415,12 @@ echo done
     ### tophat2
     #######
 
-    name=${label}_tophat2
+    name=${label_fa}_tophat2
     if [[ -d $name ]]
     then
-      echo "warning: skipped $name, remove folder to rebuid"
+      echo "* indexing $name: skipped (remove folder to rebuild)"
     else
-      echo "* building $name"
+      echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 module purge
@@ -404,7 +429,15 @@ module load TopHat
 date
 which bowtie2
 which tophat2
-tophat2 -G original.gtf --transcriptome-index $name ${label}_bowtie2/index.fa 2>&1
+tophat2 -o ${name}.tmp -G original.gtf --transcriptome-index ${name}/index \
+  ${label_fa}_bowtie2/index.fa 2>&1
+rm -r ${name}.tmp
+cd $name
+for f in *
+do
+  [[ \$f =~ ^index\.fa ]] && continue
+  mv \$f \${f/#index/index.fa}
+done
 echo done
   "
       echo "$cmd" > log/${name}.sh
