@@ -1,5 +1,13 @@
 #!/bin/bash
 
+### legal
+
+# copyright (c) 2015 - bioinformatics core group, 
+# MPI for Biology of Ageing, Cologne
+# bioinformatics@age.mpg.de
+
+### about
+
 # ensref - build and index genome data bases from ensembl
 #
 # base folder: 
@@ -11,37 +19,18 @@
 # - original.*.fa = dna sequences fasta files (e.g. toplevel, ...)
 # - cuffcompare.gtf = original.gtf annotated with tophat/cuffcompare
 # index files:
-# <dna reference level>_<aligner>, e.g.
-# toplevel_tophat2/index.fa = tophat2 index base name
-# toplevel_tophat2_cuffcompare/index.fa = tophat2/cuffcompare index base name
-
-# This script builds the references and annotations folder for each selected organism and selected release. 
-# eg. caenorhabditis_elegans release: WBcell235.78
-# Level1 folder = caenorhabditis_elegans
-# Level2 folder = WBcell235_78
-# reference genome (fasta and index) = WBcel235.dna.toplevel
-# reference GTF = WBcel235.78.gtf
-# reference GTF index = caenorhabditis_elegans/WBcell235_78/GTF_index/
-# cuffcompare fixed GTF = cuffcmp_GTF.WBcel235.78.gtf
-# other cuffcompare output files = cuffcmp.results.tar.bz2
-# cuffcompare fixed GTF index = caenorhabditis_elegans/WBcell235_78/GTF_cuffcmp_GTF_index/
-# chromosomes fasta = caenorhabditis_elegans/WBcell235_78/fasta
-
-# example tophat options: 
-# --transcriptome-index $references_directory/caenorhabditis_elegans/WBcell235_78/GTF_cuffcmp_GTF_index 
-# for the reference indexed genome use $references_directory/caenorhabditis_elegans/WBcell235_78/bowtie2/WBcel235.dna.toplevel
-
-# example cufflinks options:
-# -g $references_directory/caenorhabditis_elegans/WBcell235_78/cuffcmp_GTF.WBcel235.78.gtf
-
-# example cuffcompare options:
-# -s $references_directory/caenorhabditis_elegans/WBcell235_78/chromosomes  
+# - <dna reference level>_<aligner>, e.g.
+# - toplevel_tophat2/index.fa = tophat2 index base name
+# - toplevel_tophat2_cuffcompare/index.fa = tophat2/cuffcompare index base name
+# log files:
+# - log/*.log = stdout and stderr log of index build scripts
+# - log/*.sh = index build scripts
 
 ### functions
 
 get_organism () {
   curl -#l ftp://ftp.ensembl.org/pub/current_fasta/
-  # atlernative: ncftpls -l ftp://ftp.ensembl.org/pub/current_fasta/
+  # alternative: ncftpls -l ftp://ftp.ensembl.org/pub/current_fasta/
 }
 
 get_releases () {
@@ -69,10 +58,10 @@ VER_STAR="2.4.1d"
 USAGE="USAGE:
   $BIN [OPTIONS]
 OPTIONS:
-  -l                  : return available organisms
+  -l                  : return available organisms/release-ids
   -b PATH             : select the base directory, (default: $BASE)
   -o ORGANISM         : define organism, e.g. 'caenorhabditis_elegans'
-  -r RELEASE          : define release version, e.g. XX_YY 
+  -r RELEASE          : define release version, e.g. '81'
                         (default: automatic detection of current version)
   --ver-star VERSION  : version of STAR (default $VER_STAR)
 "
@@ -80,28 +69,32 @@ OPTIONS:
 while [[ $# -gt 0 ]]
 do
   case $1 in
-    -h)
+    -h|--help)
       echo "$USAGE"
       exit
       ;;
-    -l)
+    -l|--list)
       LIST=true
       ;;
-    -b)
+    -b|--base|--prefix)
       BASE=$2
       shift
       ;;
-    -o)
+    -o|--organism)
       ORGANISM=$2
       shift
       ;;
-    -r)
+    -r|--release)
       RELEASE=$2
       shift
       ;;
     --version-star)
       VER_STAR=$2
       shift
+      ;;
+    *)
+      echo "error: unsupported option. See '$(basename $0) --help'."
+      exit 65
       ;;
   esac
   shift
