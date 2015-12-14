@@ -299,14 +299,14 @@ if args.listDatasets:
 if args.listFilters:
     biomaRt = importr("biomaRt")
     ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart, host='www.ensembl.org')
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
     print(biomaRt.listFilters(ensembl))
     sys.exit(0)
 
 if args.listAttributes:
     biomaRt = importr("biomaRt")
     ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart, host='www.ensembl.org')
+    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
     print(biomaRt.listAttributes(ensembl))
     sys.exit(0)
 
