@@ -276,7 +276,7 @@ echo done
 "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+      sbatch -o log/${name}.log -J $jobname log/${name}.sh
     fi
   
     #######
@@ -304,7 +304,7 @@ echo done
   #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      pid_bowtie2=$(sbatch -o log/${name}.out -J $jobname log/${name}.sh)
+      pid_bowtie2=$(sbatch -o log/${name}.log -J $jobname log/${name}.sh)
       pid_bowtie2=${pid_bowtie2##* }
     fi
   
@@ -335,7 +335,7 @@ echo done
   "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.out -J $jobname -n 12 --mem=100GB log/${name}.sh
+      sbatch -o log/${name}.log -J $jobname -n 12 --mem=100GB log/${name}.sh
     fi
 
     #######
@@ -363,7 +363,7 @@ echo done
   #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+      sbatch -o log/${name}.log -J $jobname log/${name}.sh
     fi
 
 
@@ -392,7 +392,7 @@ echo done
   #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+      sbatch -o log/${name}.log -J $jobname log/${name}.sh
     fi
   
     #######
@@ -434,9 +434,9 @@ echo done
       chmod u+x log/${name}.sh
       if [[ -n $pid_bowtie2 ]]
       then
-        sbatch -o log/${name}.out -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
+        sbatch -o log/${name}.log -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
       else
-        sbatch -o log/${name}.out -J $jobname log/${name}.sh
+        sbatch -o log/${name}.log -J $jobname log/${name}.sh
       fi
     fi
   
@@ -471,7 +471,7 @@ echo done
   "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.out -J $jobname log/${name}.sh
+      sbatch -o log/${name}.log -J $jobname log/${name}.sh
     fi
 
 
