@@ -2,9 +2,9 @@
 
 ### legal
 
-# copyright (c) 2015 - bioinformatics core group, 
-# MPI for Biology of Ageing, Cologne
-# bioinformatics@age.mpg.de
+# copyright (c) 2015 - Sven E. Templer and 
+# the Bioinformatics core group, MPI for Biology of Ageing, Cologne
+# <bioinformatics at age dot mpg dot de>
 
 ### about
 
@@ -58,12 +58,17 @@ VER_STAR="2.4.1d"
 USAGE="USAGE:
   $BIN [OPTIONS]
 OPTIONS:
-  -l                  : return available organisms/release-ids
-  -b PATH             : select the base directory, (default: $BASE)
-  -o ORGANISM         : define organism, e.g. 'caenorhabditis_elegans'
-  -r RELEASE          : define release version, e.g. '81'
-                        (default: automatic detection of current version)
-  --ver-star VERSION  : version of STAR (default $VER_STAR)
+  -h, --help                : show this help and exist
+  -l, --list                : return available organisms/release-ids
+  -b, --base, --prefix PATH : select the base directory, (default: $BASE)
+  -o, --organism ORGANISM   : define organism, e.g. 'caenorhabditis_elegans'
+  -r, --release RELEASE     : define release version, e.g. '81'
+                              (default: automatic detection of current version)
+  --ver-star VERSION        : version of STAR (default $VER_STAR)
+  -n, --no-slurm            : use bash to run scripts, not sbatch from slurm
+                              (not yet integrated)
+  -c, --cpus NUMBER         : define number of CPUs (for STAR, default: 12)
+                              (not yet integrated)
 "
 
 while [[ $# -gt 0 ]]
@@ -92,8 +97,17 @@ do
       VER_STAR=$2
       shift
       ;;
+    -n|--no-slurm)
+      unset SLURM
+      echo "* warning: option '-n' not yet integrated"
+      ;;
+    -c|--cpus)
+      CPUS=$2
+      shift
+      echo "* warning: option '-c' not yet integrated"
+      ;;
     *)
-      echo "error: unsupported option. See '$(basename $0) --help'."
+      echo "error: unsupported option '$1'. See '$(basename $0) --help'."
       exit 65
       ;;
   esac
@@ -108,9 +122,21 @@ then
   exit 65
 fi
 
-### check software
+### load software environment
+# adjust this for your environment
 
-module unload STAR
+module purge
+echo "* loading software environment"
+module load slurm
+module load Bowtie2
+module load TopHat
+module load BWA
+module load STAR/$VER_STAR
+module load HISAT
+module load hisat2
+module load Cufflinks
+module load Bowtie2
+module load TopHat
 VER_STAR_ERROR=$(module load STAR/$VER_STAR 2>&1)
 if [[ -n $VER_STAR_ERROR ]]
 then
@@ -257,14 +283,12 @@ do
       echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load Bowtie2
 date
 which bowtie2-build-s
-bowtie2-build-s index.fa index.fa
 mkdir $name
 cd $name
 ln -s ../$fa index.fa
+bowtie2-build-s index.fa index.fa
 echo done
 "
       echo "$cmd" > log/${name}.sh
@@ -284,8 +308,6 @@ echo done
       echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load BWA
 date
 which bwa
 mkdir $name
@@ -311,18 +333,16 @@ echo done
       echo "* indexing $name: skipped (remove folder to rebuild)"
     else
       echo "* indexing $name"
-      echo "* building $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load STAR/$VER_STAR
 date
 which STARshort
 mkdir $name
-ln -s ../$fa $name/index.fa
-ln -s ../$gtf $name/index.fa.gtf
-STARshort --runMode genomeGenerate --genomeDir $name --genomeFastaFiles $fa \
-  --runThreadN 12 --sjdbGTFfile index.fa.gtf --sjdbOverhang 100 \
+cd $name
+ln -s ../$fa index.fa
+ln -s ../$gtf index.gtf
+STARshort --runMode genomeGenerate --genomeDir ./ --genomeFastaFiles index.fa \
+  --runThreadN 12 --sjdbGTFfile index.gtf --sjdbOverhang 100 \
   --limitGenomeGenerateRAM 90543555797
 echo done
   "
@@ -343,8 +363,6 @@ echo done
       echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load HISAT
 date
 which hisat
 mkdir $name
@@ -372,8 +390,6 @@ echo done
       echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load hisat2
 date
 which hisat2
 mkdir $name
@@ -400,10 +416,6 @@ echo done
       echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load Cufflinks
-module load Bowtie2
-module load TopHat
 date
 which cuffcompare
 which tophat2
@@ -445,15 +457,10 @@ echo done
       echo "* indexing $name"
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
-module purge
-module load Bowtie2
-module load TopHat
 date
 which bowtie2
 which tophat2
-tophat2 -o ${name}.tmp -G original.gtf --transcriptome-index ${name}/index \
-  ${label_fa}_bowtie2/index.fa 2>&1
-rm -r ${name}.tmp
+tophat2 -G $gtf -o $name --transcriptome-index $name/index ${label_fa}_bowtie2/index.fa 2>&1
 cd $name
 for f in *
 do
@@ -464,7 +471,12 @@ echo done
   "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.log -J $jobname log/${name}.sh
+      if [[ -n $pid_bowtie2 ]]
+      then
+        sbatch -o log/${name}.log -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
+      else
+        sbatch -o log/${name}.log -J $jobname log/${name}.sh
+      fi
     fi
 
 
