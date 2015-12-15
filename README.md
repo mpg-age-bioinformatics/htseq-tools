@@ -4,17 +4,20 @@ This repository hosts scripts and tools for analysis of high throughput sequenci
 
 ## Tools
 
-#### ENSrefs
+#### ensref
 
 *Made for SLURM*
 
 This is the script we use for downloading genome assemblies from ENSEMBL and 
 build the respective indexes and folders structure. 
  
-Usage: 
+For usage check the help output: 
 ```
-srun ENSrefs destination_folder
+./ensref --help
 ```
+
+The former script ENSref is deprecated and will be dropped from the repository and
+further development/maintenance.
 
 #### CCG
 
