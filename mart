@@ -1,0 +1,189 @@
+#!/usr/bin/env Rscript
+
+### about
+
+# mart - annotate tables with R/biomaRt
+#
+# Copyright 2015 - Sven E. Templer
+#
+# dependencies:
+# python >= 2.7
+# python/argparse
+# R/readxl
+# R/argparse
+# R/biomaRt
+# R/WriteXLS
+# R/plyr
+
+### get options
+
+if (!require(argparse, quietly = TRUE)) stop("missing package 'argparse'")
+p <- ArgumentParser(prog = "mart", description = "mart - annotate tables with R/biomaRt. \\
+Defaults are designed for cuffdiff output files with a gene name column.", 
+                    epilog = "Copyright (c) 2015 - Sven E. Templer <sven.templer at gmail.com>",
+                    formatter_class = "argparse.ArgumentDefaultsHelpFormatter")
+# listings:
+p$add_argument("-M", dest = "list_marts", help = "list marts", action = "store_true")
+p$add_argument("-D", dest = "list_datasets", help="list datasets for mart", action="store_true")
+p$add_argument("-F", dest = "list_filters", help="list filters for dataset", action="store_true")
+p$add_argument("-A", dest = "list_attributes", help="list attributes for dataset", action="store_true")
+# query options
+p$add_argument("-m", dest = "mart", help="select mart", 
+               default='ENSEMBL_MART_ENSEMBL')
+p$add_argument("-d", dest = "dataset", help="select dataset within mart", 
+               default='celegans_gene_ensembl')
+p$add_argument("-f", dest = "filter", help="filter defining input column format.", 
+               default='external_gene_name')
+p$add_argument("-a", "--attributes", help="attributes to output in addition to the (input) filter.", 
+               default = c("ensembl_gene_id", "gene_biotype", "go_id", "name_1006"), nargs = "*")
+# input file options
+p$add_argument("input", help = "path to tabular input file", 
+               default = "gene_exp.diff", nargs = "*") # , "cds_exp.diff"
+p$add_argument("--input-column", metavar = "NAME", help = "Column name of the IDs.", 
+               default = "gene", nargs = 1)
+p$add_argument("--input-format", help = "input file format", choices = c("tsv", "csv", "xls"), 
+               default = "tsv", nargs = 1)
+# output file options
+p$add_argument("-r", dest = "output_raw", help="write raw results in long format, no merge with input", action = "store_true")
+p$add_argument("-c", dest = "output_collapse", help = "collapse raw output into wide format", action = "store_true")
+p$add_argument("-o", dest = "output", help = "output file prefix attached to input name", 
+               default = "mart_")
+p$add_argument("-x", dest = "output_xlsx", help = "also output a .xlsx version", action = "store_true")
+arg <- p$parse_args()
+
+# dev:
+if (interactive()) {
+  setwd("~/tmp")
+  arg <- p$parse_args()
+  
+}
+
+cat("* arguments:\n")
+null <- Map(function (a, n) { cat("  ", n, ":", a, "\n") }, arg, names(arg))
+
+### do mart
+
+# prerequisites
+
+use <- avail <- list()
+if (!require(biomaRt, quietly = TRUE)) stop("missing package 'biomaRt'")
+avail$marts <- listMarts(host = "www.ensembl.org")
+
+# mart
+
+if (arg$list_marts) { print(avail$marts); q("no") }
+if (!arg$mart %in% avail$marts$biomart) stop("mart '", arg$mart, "' not available")
+use$mart <- useMart(arg$mart, host = "www.ensembl.org")
+
+# dataset
+
+avail$datasets <- listDatasets(use$mart)
+if (arg$list_datasets) { print(avail$datasets, right = FALSE); q("no") }
+if (!arg$dataset %in% avail$datasets$dataset) stop("mart '", arg$dataset, "' not available")
+use$dataset <- useDataset(arg$dataset, mart = use$mart)
+
+# filters
+
+avail$filters <- listFilters(use$dataset)
+if (arg$list_filters) { cat("name and description:\n"); apply(avail$filters, 1, function(x) {cat(paste(x, collapse = " / "), "\n")}); q("no") }
+if (!arg$filter %in% avail$filters$name) stop("mart '", arg$filter, "' not available")
+use$filter <- arg$filter
+
+# attributes
+
+avail$attributes <- listAttributes(use$dataset)
+if (arg$list_attributes) { cat("name and description:\n"); apply(avail$attributes, 1, function(x) {cat(paste(x, collapse = " / "), "\n")}); q("no") }
+if (!all(arg$attributes %in% avail$attributes$name)) stop("mart '", arg$attributes, "' not available")
+use$attributes <- c(use$filter, arg$attributes)
+
+# get data
+
+cat("* reading data\n")
+D <- lapply(arg$input, function (i) {
+
+  if (!file.exists(i)) stop("file '", i, "' does not exist")
+  if (arg$input_format == "xls" && !require(readxl)) stop("missing package 'readxl'")
+  
+  cat("  ", i, "... ")
+  d <- switch(arg$input_format,
+              tsv = read.delim(i, stringsAsFactors = F),
+              csv = read.csv(i, stringsAsFactors = F),
+              xls = read_xl(i))
+  cat("OK\n")
+  
+  if (!arg$input_column %in% names(d)) stop("could not find column '", arg$input_column, "'")
+  if (nrow(d) < 1) stop("no data in input table")
+  v <- d[,arg$input_column]
+  v <- unique(v)
+  if (any(is.na(v))) cat("   warning: missing data found and dropped\n")
+  v <- v[!is.na(v)]
+  attr(d, "query") <- v
+  attr(d, "file") <- i
+  
+  return(d)
+})
+
+V <- unlist(lapply(D, attr, "query"))
+V <- unique(V)
+cat("* querying biomart for", length(V), "values ... ")
+query <- getBM(
+  attributes = use$attributes,
+  filters = use$filter,
+  values = V,
+  mart = use$dataset)
+cat("OK\n")
+
+# collapse
+
+if (!arg$output_raw || arg$output_collapse ) {
+  if (!require(plyr, quietly = T)) stop("package 'plyr' not available")
+  cat("* collapsing ... ")
+  query <- ddply(query, use$filter, function (x) { 
+    unlist(lapply(x, function (y) {
+      paste(unique(y), collapse=";")
+    }))
+  })
+  cat("OK\n")
+}
+
+# write results
+
+cat("* exporting data\n")
+
+if (arg$output_raw) {
+  attr(query, "file") <- "raw"
+  D <- list(query)
+}
+
+null <- lapply(D, function (d) {
+  
+  i <- attr(d, "file")
+  out.name <- basename(i)
+  out.tsv <- paste0(arg$output, out.name, ".tsv")
+  
+  if (!arg$output_raw) {
+    cat("   merging", out.name, "... ")
+    d <- merge(d, query, by.x = arg$input_column, by.y = arg$filter, all.x = T, all.y = F)
+    cat("OK\n")
+  }
+  
+  cat("   writing", out.tsv, "... ")
+  write.table(d, file = out.tsv, sep = "\t", quote = F, row.names = F)
+  cat("OK\n")
+  
+  if (arg$output_xlsx) {
+    if (!require(WriteXLS, quietly = T)) stop("package 'WriteXLS' not available")
+    out.xlsx <- paste0(arg$output, out.name, ".xlsx")
+    cat("   writing", out.xlsx, "... ")
+    WriteXLS("d", ExcelFileName = out.xlsx, SheetNames = i)
+    cat("OK\n")
+  }
+  
+  NULL
+  
+})
+
+# done
+
+q("no")
+
