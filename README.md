@@ -40,7 +40,7 @@ getChromosome -h
 getChromosome -i GRCm38.dna.primary_assembly.fa -o output_folder -c 2
 ```
 
-### tuxedo-slurm.sh
+#### tuxedo-slurm.sh
 
 *Made for SLURM & Environment Modules Project*
 
@@ -57,7 +57,7 @@ This script runs a full RNAseq pipeline under a slurm jobs distribution system
 
 Please read the instructions inside the script for usage.
 
-### tuxedo_v3-slurm.sh
+#### tuxedo_v3-slurm.sh
 
 *Made for SLURM & Environment Modules Project*
 
@@ -87,6 +87,26 @@ Usage:
 
 ```
 aDiff -h
+```
+
+#### mart
+
+A command line tool to annotate ids in a column of tables (.tsv, .csv, .xls[x] format)
+with the R/biomaRt tool and optionally merge the result with the original table.
+
+Dependencies:
+* python >= 2.7
+* python/argparse
+* R (tested on version 3.2)
+* R/WriteXLS
+* R/argparse
+* R/biomaRt
+* R/plyr
+* R/readxl
+
+Usage:
+```
+mart -h
 ```
 
 #### QC.R
