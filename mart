@@ -37,7 +37,7 @@ p$add_argument("-f", dest = "filter", help="filter defining input column format.
 p$add_argument("-a", "--attributes", help="attributes to output in addition to the (input) filter.", 
                default = c("ensembl_gene_id", "gene_biotype", "go_id", "name_1006"), nargs = "*")
 # input file options
-p$add_argument("input", help = "path to tabular input file", 
+p$add_argument("input", help = "path to tabular input file(s)", 
                default = "gene_exp.diff", nargs = "*") # , "cds_exp.diff"
 p$add_argument("--input-column", metavar = "NAME", help = "Column name of the IDs.", 
                default = "gene", nargs = 1)
