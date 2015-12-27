@@ -40,6 +40,15 @@ getChromosome -h
 getChromosome -i GRCm38.dna.primary_assembly.fa -o output_folder -c 2
 ```
 
+#### make.genome
+
+Create genome file for bedtools. The output is a tab-delimited file of chromosome name followed by it length.
+
+Usage:
+```
+make.genome -h
+```
+
 #### tuxedo-slurm.sh
 
 *Made for SLURM & Environment Modules Project*
