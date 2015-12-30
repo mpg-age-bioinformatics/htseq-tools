@@ -49,6 +49,15 @@ Usage:
 make.genome -h
 ```
 
+#### GATKlift
+
+This scripts lifts GTF and fasta files from GATK reconstructions (ie. FastaAlternateReferenceMaker).
+
+Usage:
+```
+GATKlift -h
+```
+
 #### tuxedo-slurm.sh
 
 *Made for SLURM & Environment Modules Project*
