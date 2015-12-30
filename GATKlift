@@ -1,0 +1,202 @@
+#!/bin/env python
+import pandas as pd
+import numpy as np
+import os
+import sys
+import csv
+from argparse import ArgumentParser
+
+parser = ArgumentParser()
+parser.add_argument('--oGTF', dest = 'oGTF',
+                    help = 'Input original GTF file.  ',
+                    required=True)
+parser.add_argument('--destGTF', dest = 'destGTF',
+                    help = 'Lifted GTF file (destination).',
+                    required=True)
+parser.add_argument('--VCF', dest = 'VCF',
+                    help = 'VCF file.',
+                    required=True)
+parser.add_argument('--oFASTA', dest = 'oFASTA',
+                    help = 'Original fasta file.',
+                    required=True)
+parser.add_argument('--rFASTA', dest = 'rFASTA',
+                    help = 'Reconstructed fasta file.',
+                    required=True)
+parser.add_argument('--destFASTA', dest = 'destFASTA',
+                    help = 'Lifted fasta file (destination).',
+                    required=True)
+o = parser.parse_args()
+
+GTF_FILE=os.path.realpath(o.oGTF)
+VCF_FILE=os.path.realpath(o.VCF)
+GTF_OUT=os.path.realpath(o.destGTF)
+
+multifasta_original=os.path.realpath(o.oFASTA)
+multifasta_reconstructed=os.path.realpath(o.rFASTA)
+output_fasta=os.path.realpath(o.destFASTA)
+
+# redirect some of the final pandas error/alternatives messages
+@contextlib.contextmanager
+def nostderr():
+    savestderr = sys.stderr
+    class Devnull(object):
+        def write(self, _): pass
+        def flush(self): pass
+    sys.stderr = Devnull()
+    try:
+        yield
+    finally:
+        sys.stderr = savestderr
+
+def lx(x):
+    a=x.split(",")
+    count=[]
+    for i in a:
+        count.append(len(i))
+    return min(count)
+
+def fix(x,cumdiffVCF):
+    VCF=cumdiffVCF[cumdiffVCF['pos']<=x]
+    if len(VCF) > 0:
+        m=VCF['pos'].max()
+        VCF=VCF[VCF['pos']==m]
+        v=VCF['cumDif'].tolist()[0]
+        v=x+v
+    else:
+        v=x
+    return v
+
+def pin_len(fasta_in):
+    with open(fasta_in, 'r+') as f:
+        sys.stdout.flush()
+        lines = f.readlines()
+        total=len(lines)
+        sizes=pd.DataFrame()
+        for i in range(0, total):
+            line = lines[i]
+            if line[0] == ">":
+                fChr=line.split(" ")[0]
+                fChr=fChr[1:]
+                seq=str("")
+                s=i
+                code=['N','A','C','T','G']
+                firstbase=lines[s+1][0]
+                while firstbase in code:
+                    s=s + 1
+                    seq=seq+lines[s]
+                    if s+1 < total:
+                        firstbase=lines[s+1][0]
+                    else:
+                        firstbase="O"
+                d={fChr:len(seq)}
+                d=pd.DataFrame(d,index=[0])
+                d=d.transpose()
+                sizes=pd.concat([sizes,d])
+    return sizes
+
+def relabel(fasta_in,output_fasta,dic):
+    with open(fasta_in, 'r+') as f:
+        sys.stdout.flush()
+        lines = f.readlines()
+        total=len(lines)
+        sizes=pd.DataFrame()
+        f2=open(output_fasta,'w')
+        for i in range(0, total):
+            line = lines[i]
+            if line[0] == ">":
+                fChr=line.split(" ")[0]
+                fChr=fChr[1:]
+                fChr=dic.get(fChr)
+                s=i
+                code=['N','A','C','T','G']
+                firstbase=lines[s+1][0]
+                f2.write(">"+str(fChr)+"\n")
+                while firstbase in code:
+                    s=s + 1
+                    f2.write(lines[s])
+                    if s+1 < total:
+                        firstbase=lines[s+1][0]
+                    else:
+                        firstbase="O"
+                f2.close
+
+with nostderr():
+
+    # Fix GTF
+    print "Fixing GTF file"
+    sys.stdout.flush()
+
+    GTF=pd.read_table(GTF_FILE, sep='\t', comment="#", header=None, dtype=str)
+    VCF=pd.read_table(VCF_FILE,comment="#",header=None)
+    VCF=VCF[[0,1,3,4]]
+    VCF.columns=['chr','pos','ref','new']
+
+    VCF['ref']=VCF['ref'].astype(str)
+    VCF['new']=VCF['new'].astype(str)
+    
+    VCF['lref']=VCF['ref'].apply(lambda x: lx(x)) 
+    VCF['lnew']=VCF['new'].apply(lambda x: lx(x))
+
+    VCF['dif']=VCF['lnew'] - VCF['lref']
+
+    VCF.sort(columns=['chr','pos'], inplace=True)
+    VCF=VCF[VCF['dif']>0]
+    VCF.reset_index(inplace=True,drop=True)
+
+    nVCF=pd.DataFrame()
+    VCF=VCF[['chr','pos','dif']]
+    chrs= list(set(VCF['chr'].tolist()))
+    for c in chrs:
+        tmpC=VCF[VCF['chr']==c]
+        tmpC['cumDif']=tmpC['dif'].cumsum()
+        nVCF=pd.concat([nVCF,tmpC])
+    
+    GTF.columns=['chr','source','type','start','stop','score','strand','val','ann']
+    GTF['start']=GTF['start'].astype(int)
+    GTF['stop']=GTF['stop'].astype(int)
+    nVCF['pos']=nVCF['pos'].astype(int)
+
+    done=[]
+    fGTF=pd.DataFrame()
+    for c in GTF['chr'].tolist():
+        if c not in done:
+            print c
+            sys.stdout.flush()
+            done.append(c)
+            GTFt=GTF[GTF['chr']==c]
+            VCFt=nVCF[nVCF['chr']==c]
+            GTFt['start']=GTFt['start'].apply(lambda x: fix(x,VCFt))
+            GTFt['stop']=GTFt['stop'].apply(lambda x: fix(x,VCFt))
+            fGTF=pd.concat([fGTF,GTFt])
+        
+    fGTF.to_csv(GTF_OUT, sep="\t",header=None,index=None,quoting=csv.QUOTE_NONE)
+
+    # Fix fasta
+
+    print "Fixing fasta file"
+    sys.stdout.flush()
+
+    print "original"
+    sys.stdout.flush()
+    original=pin_len(multifasta_original)
+    print original
+
+    print "reconstructed"
+    sys.stdout.flush()
+    recons=pin_len(multifasta_reconstructed)
+    print recons
+
+    original=original.reset_index()
+    recons=recons.reset_index()
+
+    original.columns=['original','size_original']
+    recons.columns=['recons','size_recons']
+    mapped=pd.concat([original,recons],axis=1)
+    dic=mapped[['recons','original']]
+    dic=dic.set_index(['recons'])
+
+    dic=dic.to_dict()
+    dic=dic.get("original")
+
+    relabel(multifasta_reconstructed,output_fasta,dic)
+
