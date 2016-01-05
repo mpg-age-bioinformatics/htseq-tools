@@ -16,8 +16,12 @@ For usage check the help output:
 ./ensref --help
 ```
 
-The former script ENSref is deprecated and will be dropped from the repository and
-further development/maintenance.
+The former script ENSrefs is deprecated. See the history with
+
+```
+git log -- ENSrefs build-ref.sh
+git log -p -- ENSrefs build-ref.sh # with diff
+```
 
 #### CCG
 
