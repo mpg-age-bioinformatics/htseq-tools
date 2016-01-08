@@ -217,7 +217,7 @@ for serie in $series; do
 
         # HISAT call 
 
-        hisat -p 18 ${lib} --met-file ${top}hisat_output/${file::(-16)}.stats \
+        hisat -p 18 ${lib} --dta --met-file ${top}hisat_output/${file::(-16)}.stats \
         -x ${hisat_index} -S ${top}hisat_output/${file::(-16)}.sam \
         ${files}
 
