@@ -15,7 +15,8 @@ parser.add_argument("-C", "--cuffcompareGTF", help="Merged cuffcompared GTF")
 parser.add_argument("-f", "--inputFiles", help="Implies -s. Use this option to select which *.diff files you wish to analyse.'.", default='gene_exp.diff promoters.diff splicing.diff cds.diff isoform_exp.diff')
 parser.add_argument("-s", "--shortOutputName", help="Use this option to select a short outpput name for each *.diff file used in '-f'. No '.' (dots) allowed.", default='geneexp prom splic cds iso')
 parser.add_argument("--sigOnly", help="Only create report tables for cuffdiff-labeled significantly changed genes", action="store_true")
-parser.add_argument("--TSV", help="For p values > = 1 write tables as tab separated values", action="store_true")
+parser.add_argument("--TSV", help="For p values > = 0.05 write tables as tab separated values", action="store_true")
+parser.add_argument("--TSVall",help="Save p < 0.05 save tables as tab separated values in a folder called TSV", action="store_true")
 parser.add_argument("--description", help="Get a description of what this script does.", action="store_true")
 parser.add_argument("--listMarts", help="List biomaRt Marts",action="store_true")
 parser.add_argument("--mart", help="Your mart of choice.", default='ENSEMBL_MART_ENSEMBL')
@@ -350,6 +351,11 @@ if not os.path.exists(python_output):
     os.makedirs(python_output)
 python_output=os.path.realpath(python_output)
 
+if args.TSVall:
+    if not os.path.exists(python_output):
+        os.makedirs(python_output+"/TSV")
+    TSVout=os.path.realpath(python_output+"/TSV")+"/"
+
 print "\nInput folder: "+diff_out
 sys.stdout.flush()
 print "Output folder: "+python_output
@@ -555,8 +561,9 @@ else:
 
 
 # create excel report tables
-print "\nCreating excel report tables"
-sys.stdout.flush()
+if args.TSV:
+    print "\nCreating excel report tables"
+    sys.stdout.flush()
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
@@ -568,13 +575,21 @@ for sig, label in zip(sig_choice,label_choice):
         if sig >= 1:
             if args.TSV:
 		print "For "+str(label)+" files will be saved as tsv"
+                sys.stdout.flush()
             else:
                 writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
-
+                print "\nWritting table "+label+".xlsx"
+                sys.stdout.flush()
+    
 	else:
-            writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
-        print "\nWritting table "+label+".xlsx"
-        sys.stdout.flush()
+            if args.TSVall:
+                print "Saving files as TSV in %s" %TSVout
+                sys.stdout.flush()
+            else:
+                writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
+                print "\nWritting table "+label+".xlsx"
+                sys.stdout.flush()
+
     for imp, outshort in zip(in_files, out_labels):
         df = pd.read_table(imp)
         if len(df) == 0:
@@ -584,9 +599,10 @@ for sig, label in zip(sig_choice,label_choice):
             sys.stdout.flush()
 
             if sig == 'yes':
-                writer = pd.ExcelWriter(python_output+'/'+label+'_'+outshort+'.xlsx')
-                print "Writting table "+label+"_"+outshort+".xlsx"
-                sys.stdout.flush()
+                if not args.TSVall:
+                    writer = pd.ExcelWriter(python_output+'/'+label+'_'+outshort+'.xlsx')
+                    print "Writting table "+label+"_"+outshort+".xlsx"
+                    sys.stdout.flush()
 
             df = df.sort('p_value')
             df = df.sort('q_value')
@@ -655,7 +671,11 @@ for sig, label in zip(sig_choice,label_choice):
                                     if imp not in ['gene_exp.diff','isoform_exp.diff']:
                                         df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
 
-                                    df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
+                                    if not args.TSVall:
+                                        df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
+                                    else:                                
+                                        df_pair.to_csv(TSVout+label+'_'+outshort+'_'+sample1+'_vs_'+sample2+'.tsv',sep="\t", index=False)                                    
+
 
 
             df.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
@@ -664,27 +684,32 @@ for sig, label in zip(sig_choice,label_choice):
                 df.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
 
             if sig == 'yes':
-                df.to_excel(writer, 'ALL', index=False)
-                writer.save()
+                if not args.TSVall:
+                    df.to_excel(writer, 'ALL', index=False)
+                    writer.save()
+                else:
+                    df.to_csv(TSVout+label+'_'+outshort+'_ALL.tsv',sep="\t", index=False)
                 
         if sig != 'yes':
             if sig >= 1:
                 if args.TSV:
-                    df.to_csv(python_output+'/'+outshort+'_'+'ALL.tsv', index=False)
+                    df.to_csv(python_output+'/'+outshort+'_'+'ALL.tsv',sep="\t", index=False)
                 else:
                     df.to_excel(writer, outshort+'_'+'ALL', index=False)
 
             else:
-                df.to_excel(writer, outshort+'_'+'ALL', index=False)
+                if not args.TSVall:
+                    df.to_excel(writer, outshort+'_'+'ALL', index=False)
 
     if sig != 'yes':
         if sig >= 1:
             if args.TSV:
                 print "For "+str(label)+" files were saved as tsv" 
             else:
-	        writer.save()
+                writer.save()
         else:
-            writer.save()
+            if not args.TSVall:
+                writer.save()
 
 if args.DAVID:
     DAVID_tmp_files=os.listdir(python_output)
@@ -696,13 +721,18 @@ if args.DAVID:
         cat_to_exc.append(c)
     cat_to_exc=list(set(cat_to_exc))
     for c in cat_to_exc:
-        writer = pd.ExcelWriter(python_output+'/'+c+'.xlsx')
+        if not args.TSVall:
+            writer = pd.ExcelWriter(python_output+'/'+c+'.xlsx')
         cat_files=[s for s in DAVID_tmp_files if c in s]
         for f in cat_files:
             df=pd.read_table(python_output+'/'+f)
             sheet_name=f.split(".")[2]
-            df.to_excel(writer, sheet_name, index=False)
-        writer.save()
+            if not args.TSVall:
+                df.to_excel(writer, sheet_name, index=False)
+            else:
+                df.to_csv(TSVout+c+sheet_name+'.tsv',sep="\t", index=False)
+        if not args.TSVall:
+            writer.save()
 
     for f in DAVID_tmp_files:
         os.remove(python_output+'/'+f)
