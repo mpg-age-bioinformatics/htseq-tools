@@ -348,7 +348,7 @@ echo done
   "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -o log/${name}.log -J $jobname -n 12 --mem=150GB log/${name}.sh
+      sbatch -N 1 -o log/${name}.log -J $jobname -n 12 --mem=150GB log/${name}.sh
     fi
 
     #######
