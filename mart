@@ -175,7 +175,9 @@ null <- lapply(D, function (d) {
     if (!require(WriteXLS, quietly = T)) stop("package 'WriteXLS' not available")
     out.xlsx <- paste0(arg$output, out.name, ".xlsx")
     cat("   writing", out.xlsx, "... ")
-    WriteXLS("d", ExcelFileName = out.xlsx, SheetNames = i)
+    n <- basename(i)
+    n <- substr(n, 1, 31)
+    WriteXLS("d", ExcelFileName = out.xlsx, SheetNames = n)
     cat("OK\n")
   }
   
