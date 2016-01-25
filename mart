@@ -63,6 +63,19 @@ w <- system("stty -a | head -n 1 | awk '{print $7}' | sed 's/;//'", intern=T)
 w <- as.integer(w)
 options(width = w)
 
+printdf <- function (x, collapse = NULL, msg = NULL) {
+  x <- data.frame(row = seq(nrow(x)), x, stringsAsFactors = FALSE)
+  if (!is.null(msg))
+    cat(msg, "\n")
+  if (is.null(collapse)) {
+    print(x, right = FALSE, row.names = FALSE)
+  } else {
+    cat(paste(colnames(x), collapse = collapse), "\n")
+    apply(x, 1, function(y) {cat(paste(y, collapse = collapse), "\n")})
+  }
+  invisible(NULL)
+}
+
 cat("* arguments:\n")
 null <- Map(function (a, n) { cat("  ", n, ":", a, "\n") }, arg, names(arg))
 
@@ -76,28 +89,28 @@ avail$marts <- listMarts(host = "www.ensembl.org")
 
 # mart
 
-if (arg$list_marts) { print(avail$marts); q("no") }
+if (arg$list_marts) { printdf(avail$marts, msg = "* printing available marts"); q("no") }
 if (!arg$mart %in% avail$marts$biomart) stop("mart '", arg$mart, "' not available")
 use$mart <- useMart(arg$mart, host = "www.ensembl.org")
 
 # dataset
 
 avail$datasets <- listDatasets(use$mart)
-if (arg$list_datasets) { print(avail$datasets, right = FALSE); q("no") }
+if (arg$list_datasets) { printdf(avail$datasets, msg = "* printing available datasets"); q("no") }
 if (!arg$dataset %in% avail$datasets$dataset) stop("mart '", arg$dataset, "' not available")
 use$dataset <- useDataset(arg$dataset, mart = use$mart)
 
 # filters
 
 avail$filters <- listFilters(use$dataset)
-if (arg$list_filters) { cat("name and description:\n"); apply(avail$filters, 1, function(x) {cat(paste(x, collapse = " / "), "\n")}); q("no") }
+if (arg$list_filters) { printdf(avail$filters, msg = "* printing available filters"); q("no") }
 if (!arg$filter %in% avail$filters$name) stop("mart '", arg$filter, "' not available")
 use$filter <- arg$filter
 
 # attributes
 
 avail$attributes <- listAttributes(use$dataset)
-if (arg$list_attributes) { cat("name and description:\n"); apply(avail$attributes, 1, function(x) {cat(paste(x, collapse = " / "), "\n")}); q("no") }
+if (arg$list_attributes) { printdf(avail$attributes, msg = "* printing available attributes"); q("no") }
 if (!all(arg$attributes %in% avail$attributes$name)) stop("mart '", arg$attributes, "' not available")
 use$attributes <- c(use$filter, arg$attributes)
 
