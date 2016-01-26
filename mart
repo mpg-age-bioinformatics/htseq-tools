@@ -49,6 +49,7 @@ p$add_argument("-c", dest = "output_collapse", help = "collapse raw output into 
 p$add_argument("-o", dest = "output", help = "output file prefix attached to input name", 
                default = "mart_")
 p$add_argument("-x", dest = "output_xlsx", help = "also output a .xlsx version", action = "store_true")
+p$add_argument("-v", "--verbose", help = "be verbose (print arguments list)", action = "store_true")
 arg <- p$parse_args()
 
 # dev:
@@ -59,9 +60,11 @@ if (interactive()) {
 }
 
 #w <- Sys.getenv("COLUMNS")
-w <- system("stty -a | head -n 1 | awk '{print $7}' | sed 's/;//'", intern=T)
-w <- as.integer(w)
-options(width = w)
+if (any(arg$list_marts, arg$list_attributes, arg$list_datasets, arg$list_filters)) {
+  w <- system("stty -a 2>/dev/null | head -n 1 | awk '{print $7}' | sed 's/;//' ", intern=T)
+  w <- if (!length(w)) 1e4L else as.integer(w)
+  options(width = w)
+}
 
 printdf <- function (x, collapse = NULL, msg = NULL) {
   x <- data.frame(row = seq(nrow(x)), x, stringsAsFactors = FALSE)
@@ -76,8 +79,10 @@ printdf <- function (x, collapse = NULL, msg = NULL) {
   invisible(NULL)
 }
 
-cat("* arguments:\n")
-null <- Map(function (a, n) { cat("  ", n, ":", a, "\n") }, arg, names(arg))
+if (arg$verbose) {
+  cat("* arguments:\n")
+  null <- Map(function (a, n) { cat("  ", n, ":", a, "\n") }, arg, names(arg))
+}
 
 ### do mart
 
