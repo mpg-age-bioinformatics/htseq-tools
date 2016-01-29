@@ -352,7 +352,7 @@ if not os.path.exists(python_output):
 python_output=os.path.realpath(python_output)
 
 if args.TSVall:
-    if not os.path.exists(python_output):
+    if not os.path.exists(python_output+"/TSV"):
         os.makedirs(python_output+"/TSV")
     TSVout=os.path.realpath(python_output+"/TSV")+"/"
 
