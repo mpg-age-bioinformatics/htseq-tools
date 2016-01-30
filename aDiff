@@ -629,13 +629,13 @@ for sig, label in zip(sig_choice,label_choice):
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
 
-                def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
-                    if len(table_of_interest.index) >= 1:
-                        enr = DAVID_get(args.DAVIDcat, table_of_interest, name_vs_id_table)
-                        if len(enr.index) >= 1:
-                            recovered_cats=list(set(enr['Category'].tolist()))
-                            for c in recovered_cats:
-                                enr[enr['Category']==c].to_csv(python_output+"/DAVID."+c+"_"+label+"_"+outshort+"."+sheet_name+".tmp",index=False, sep="\t")
+                #def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
+                #    if len(table_of_interest.index) >= 1:
+                #        enr = DAVID_get(args.DAVIDcat, table_of_interest, name_vs_id_table)
+                #        if len(enr.index) >= 1:
+                #            recovered_cats=list(set(enr['Category'].tolist()))
+                #            for c in recovered_cats:
+                #                enr[enr['Category']==c].to_csv(python_output+"/DAVID."+c+"_"+label+"_"+outshort+"."+sheet_name+".tmp",index=False, sep="\t")
 
                 sample1 = df[['sample_1']]
                 sample1.columns=['samples']
@@ -644,6 +644,10 @@ for sig, label in zip(sig_choice,label_choice):
                 samples=pd.concat([sample1,sample2])
                 samples=samples.drop_duplicates()
                 samples=samples['samples'].tolist()
+
+                if args.DAVID:
+                    DAVIDall=pd.DataFrame()
+
 
                 readyList=[]
 
@@ -658,7 +662,21 @@ for sig, label in zip(sig_choice,label_choice):
                                     if args.DAVID:
                                         print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
                                         sys.stdout.flush()
-                                        DAVID_write(df_pair, name_id, sample1+'|'+sample2)
+                                        
+                                        targets = pd.merge(df_pair, name_id, how='left', left_on='identifier', right_on='gene_name')
+                                        targets = targets[['gene_id']].dropna()
+                                        targets = targets.gene_id.tolist()
+
+                                        background = all_genes_table[['g_id']].dropna()
+                                        background = background.gene_id.tolist()
+                                        
+                                        ids=pd.merge(df_pair[['gene','
+                                        dfDAVID=DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=, ids_bg=name_id["gene_id"].tolist(), bgName = 'all_RNAseq_genes', listName = 'changed_genes')
+                                        dfDAVID['sheet_name'] = sample1+'|'+sample2
+                                        dfDAVID['file_name'] = _"+label+"_"+outshort+".xlsx"                                   
+                                        DAVIDall=pd.concat([DAVIDall,dfDAVID])
+                                        
+                                        #DAVID_write(df_pair, name_id, sample1+'|'+sample2)
 
                                     df_pair.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
 
