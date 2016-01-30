@@ -280,7 +280,7 @@ def DAVID_get(cat, filtered_table, all_genes_table):
         enrichN=enrichN.reset_index(drop=True)
 
     else:
-    enrichN=pd.DataFrame()
+        enrichN=pd.DataFrame()
 
     os.remove('targets_tmp.txt')
     os.remove('background_tmp.txt')
@@ -566,14 +566,14 @@ for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
         if sig >= 1:
             if args.TSV:
-        print "For "+str(label)+" files will be saved as tsv"
+                print "For "+str(label)+" files will be saved as tsv"
                 sys.stdout.flush()
             else:
                 writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
                 print "\nWritting table "+label+".xlsx"
                 sys.stdout.flush()
     
-    else:
+        else:
             if args.TSVall:
                 print "Saving files as TSV in %s" %TSVout
                 sys.stdout.flush()
