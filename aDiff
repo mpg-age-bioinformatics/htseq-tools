@@ -291,7 +291,7 @@ def DAVID_get(cat, filtered_table, all_genes_table):
 
 
 if args.listMarts:
-    print(age.databasesBM(host=biomart_host))
+    print(age.databasesBM())
     sys.exit(0)
 
 if args.listDatasets:
@@ -299,11 +299,11 @@ if args.listDatasets:
     sys.exit(0)
 
 if args.listFilters():
-    print(age.filtersBM(args.dataset,host=biomart_host))
+    print(age.filtersBM(args.dataset))
     sys.exit(0)
 
 if args.listAttributes:
-    print(age.attributesBM(args.dataset,host=biomart_host))
+    print(age.attributesBM(args.dataset))
     sys.exit(0)
 
 if args.listKEGGorganisms:
@@ -316,7 +316,7 @@ if args.findKEGGdb:
     gtf=age.readGTF(os.path.realpath(args.originalGTF))
     print "GTF imported"
     sys.stdout.flush()
-    gtf = gtf.astype(str)
+    #gtf = gtf.astype(str)
     gene_id = age.retrieve_GTF_field('gene_id',gtf)
     gene_id = gene_id['gene_id'].tolist()
     print(age.databasesKEGG(args.KEGGorg,gene_id))
@@ -492,9 +492,9 @@ else:
     sys.stdout.flush()
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
     ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
-    ontology.columns = ['g_id','gene_biotype','GO_id','GO_term']
+    ontology.columns = ['gene_id','gene_biotype','GO_id','GO_term']
     ontology = pd.merge(name_id, ontology, how='outer', on='g_id')
-    ontology = ontology[['g_name','gene_biotype','GO_id','GO_term']]
+    ontology = ontology[['gene_name','gene_biotype','GO_id','GO_term']]
     ontology.columns = ['gene_name','gene_biotype','GO_id','GO_term']
 
     final = pd.DataFrame(columns = ['gene_name','gene_biotype','GO_id','GO_term'])
@@ -541,13 +541,15 @@ elif os.path.isfile(python_output+'/KEGG.txt'):
 else:
     print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
     sys.stdout.flush()
-    kegg_ens=ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
-    paths=KEGG_paths(args.KEGGorg)
+    #names_KEGGids=age.idsKEGG(args.KEGGorg)
+    kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
+    paths = age.pathwaysKEGG(args.KEGGorg)
+    #paths=KEGG_paths(args.KEGGorg)
     df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')    
     df=df[['ENSid','KEGGid','pathIDs','pathName']]
-    df.columns=['g_id','KEGGid','pathIDs','pathName']
+    df.columns=['gene_id','KEGGid','pathIDs','pathName']
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-    df=pd.merge(name_id,df,on=['g_id'],how='left')
+    df=pd.merge(name_id,df,on=['gene_id'],how='left')
     df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
     del kegg_ens,paths,df,name_id
 
@@ -616,11 +618,11 @@ for sig, label in zip(sig_choice,label_choice):
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf = pd.read_table(merged_fixed_gtf, sep='\t', comment="#", header=None, dtype=str)
-                t_id = retrieve_GTF_field('transcript_id',gtf)    
-                n_ref = retrieve_GTF_field('nearest_ref',gtf)
+                t_id = age.retrieve_GTF_field('transcript_id',gtf)    
+                n_ref = age.retrieve_GTF_field('nearest_ref',gtf)
 
                 id_ref = pd.concat([t_id, n_ref], axis=1).drop_duplicates()
-                id_ref.columns = ['transcript_id','nearest_ref']
+                #id_ref.columns = ['transcript_id','nearest_ref']
 
                 df = pd.merge(id_ref, df, how='right', left_on='transcript_id', right_on='test_id')
 
