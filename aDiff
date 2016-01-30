@@ -49,15 +49,17 @@ install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install
 
 import pandas as pd
 import numpy as np
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
+#import rpy2.robjects as robjects
+#from rpy2.robjects.packages import importr
 import time
 from datetime import datetime
 import shutil
 from urllib import urlopen
+import AGEpy.AGEpy as age
+
 
 ############### FUNCTIONS ############
-
+"""
 def retrieve_GTF_field(field,gtf):
     field = pd.DataFrame(gtf[8].str.split(field).tolist())[1]
     field = field.astype(str)
@@ -285,47 +287,39 @@ def DAVID_get(cat, filtered_table, all_genes_table):
 
     return enrichN
 
+"""
+
 
 if args.listMarts:
-    biomaRt = importr("biomaRt")
-    print(biomaRt.listMarts(host='www.ensembl.org'))
+    print(age.databasesBM(host=biomart_host))
     sys.exit(0)
 
 if args.listDatasets:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
-    print(biomaRt.listDatasets(ensemblMart))
+    print(age.datasetsBM())
     sys.exit(0)
 
-if args.listFilters:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    print(biomaRt.listFilters(ensembl))
+if args.listFilters():
+    print(age.filtersBM(args.dataset,host=biomart_host))
     sys.exit(0)
 
 if args.listAttributes:
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    print(biomaRt.listAttributes(ensembl))
+    print(age.attributesBM(args.dataset,host=biomart_host))
     sys.exit(0)
 
 if args.listKEGGorganisms:
-    list_KEGG_organisms()
+    print(age.organismsKEGG())
     sys.exit(0)
 
 if args.findKEGGdb:
     print "This option requires --originalGTF"
     sys.stdout.flush()
-    gtf = pd.read_table(os.path.realpath(args.originalGTF), sep='\t', skiprows=6, header=None, dtype=str)
+    gtf=age.readGTF(os.path.realpath(args.originalGTF))
     print "GTF imported"
     sys.stdout.flush()
     gtf = gtf.astype(str)
-    gene_id = retrieve_GTF_field('gene_id',gtf)
-    gene_id.columns=['gene_id']
+    gene_id = age.retrieve_GTF_field('gene_id',gtf)
     gene_id = gene_id['gene_id'].tolist()
-    find_KEGG_ensemblDB(args.KEGGorg,gene_id)
+    print(age.databasesKEGG(args.KEGGorg,gene_id))
     sys.exit(0)
 
 
@@ -436,33 +430,34 @@ else:
     print "Imported list of differentially regulated genes"
     sys.stdout.flush()
 
-    gtf = pd.read_table(original_gtf, sep='\t', comment="#", header=None, dtype=str)
+    #gtf = pd.read_table(original_gtf, sep='\t', comment="#", header=None, dtype=str)
+    gtf=age.readGTF(original_gtf)
     print "GTF imported"
     sys.stdout.flush()
-    gtf = gtf.astype(str)
+    #gtf = gtf.astype(str)
 
-    gene_name = retrieve_GTF_field('gene_name',gtf)
+    gene_name = age.retrieve_GTF_field('gene_name',gtf)
     print "Read gene names from GTF"
     sys.stdout.flush()
 
-    gene_id = retrieve_GTF_field('gene_id',gtf)
+    gene_id = age.retrieve_GTF_field('gene_id',gtf)
     print "Read gene ids from GTF"
     sys.stdout.flush()
 
     name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
-    name_id.columns = ['g_name','g_id']
-    name_id = name_id[name_id['g_name'].isin(genes)]
+    #name_id.columns = ['g_name','g_id']
+    name_id = name_id[name_id['gene_name'].isin(genes)]
     print "Generated Names/IDs table"
     sys.stdout.flush()
 
-    genes = name_id['g_id'].tolist()
+    genes = name_id['gene_id'].tolist()
 
     name_id.to_csv(python_output+'/genes_table.txt', sep="\t",index=False)
 
     del gtf, gene_name, gene_id, name_id
 
 
-# Use R and BioMart to retrieve biotypes and gene ontoloty information
+# Use BioMart to retrieve biotypes and gene ontoloty information
 
 if os.path.isfile(genomes_folder+'/biotypes_go_raw.txt'):
     print "\nCopying already existing biotypes_go_raw.txt file from genomes folder: "+str(genomes_folder)+"."
@@ -476,12 +471,9 @@ elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
 else:
     print "\nRetrieving biotypes and gene ontoloy information"
     sys.stdout.flush()
-    biomaRt = importr("biomaRt")
-    ensemblMart=biomaRt.useMart(args.mart, host='www.ensembl.org')
-    ensembl=biomaRt.useDataset(args.dataset, mart=ensemblMart)
-    biotypes=biomaRt.getBM(attributes=data_output_biotypes, filters=data_filter, values=genes, mart=ensembl)
-    goterms=biomaRt.getBM(attributes=data_output_goterms, filters=data_filter, values=genes, mart=ensembl)
-    bio_go=robjects.r.merge(biotypes, goterms,by=1, all='TRUE')
+    biotypes=age.queryBM(data_filter,genes,data_output_biotype)
+    goterms=age.queryBM(data_filter,genes,data_output_goterms)
+    bio_go=pd.merge(biotypes,goterms,on=[data_output_biotypes[0]],how="outer")
     bio_go.to_csvfile(python_output+'/biotypes_go_raw.txt', quote=False, sep='\t', row_names=False)
 
 
