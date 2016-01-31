@@ -298,7 +298,7 @@ if args.listDatasets:
     print(age.datasetsBM())
     sys.exit(0)
 
-if args.listFilters():
+if args.listFilters:
     print(age.filtersBM(args.dataset))
     sys.exit(0)
 
@@ -413,7 +413,7 @@ if os.path.isfile(python_output+'/genes_table.txt'):
     print "\nUsing already existing list of gene names and ids"
     sys.stdout.flush()
     genes=pd.read_table(python_output+'/genes_table.txt')
-    genes = genes['g_id'].tolist()
+    genes = genes['gene_id'].tolist()
 
 else:
     print "\nGetting list of gene names and respective ids present in the data set"
@@ -471,10 +471,12 @@ elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
 else:
     print "\nRetrieving biotypes and gene ontoloy information"
     sys.stdout.flush()
-    biotypes=age.queryBM(data_filter,genes,data_output_biotype)
-    goterms=age.queryBM(data_filter,genes,data_output_goterms)
-    bio_go=pd.merge(biotypes,goterms,on=[data_output_biotypes[0]],how="outer")
-    bio_go.to_csvfile(python_output+'/biotypes_go_raw.txt', quote=False, sep='\t', row_names=False)
+    biotypes=age.queryBM(data_filter,genes,data_output_biotypes,args.dataset)
+    biotypes.columns=[data_filter,data_output_biotypes[1]]
+    goterms=age.queryBM(data_filter,genes,data_output_goterms,args.dataset)
+    goterms.columns=[data_filter,data_output_goterms[1],data_output_goterms[2]]
+    bio_go=pd.merge(biotypes,goterms,on=data_filter,how="outer")
+    bio_go.to_csv(python_output+'/biotypes_go_raw.txt', quote=False, sep='\t', row_names=False)
 
 
 # generate biotypes and go terms table using R/biomart output table.
@@ -493,7 +495,7 @@ else:
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
     ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
     ontology.columns = ['gene_id','gene_biotype','GO_id','GO_term']
-    ontology = pd.merge(name_id, ontology, how='outer', on='g_id')
+    ontology = pd.merge(name_id, ontology, how='outer', on='gene_id')
     ontology = ontology[['gene_name','gene_biotype','GO_id','GO_term']]
     ontology.columns = ['gene_name','gene_biotype','GO_id','GO_term']
 
@@ -667,13 +669,13 @@ for sig, label in zip(sig_choice,label_choice):
                                         targets = targets[['gene_id']].dropna()
                                         targets = targets.gene_id.tolist()
 
-                                        background = all_genes_table[['g_id']].dropna()
+                                        background = all_genes_table[['gene_id']].dropna()
                                         background = background.gene_id.tolist()
                                         
-                                        ids=pd.merge(df_pair[['gene','
+                                        
                                         dfDAVID=DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=name_id["gene_id"].tolist(), bgName = 'all_RNAseq_genes', listName = 'changed_genes')
                                         dfDAVID['sheet_name'] = sample1+'|'+sample2
-                                        dfDAVID['file_name'] = _"+label+"_"+outshort+".xlsx"                                   
+                                        dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx"                                   
                                         DAVIDall=pd.concat([DAVIDall,dfDAVID])
                                         
                                         #DAVID_write(df_pair, name_id, sample1+'|'+sample2)
