@@ -671,7 +671,7 @@ for sig, label in zip(sig_choice,label_choice):
                                         background = background.gene_id.tolist()
                                         
                                         ids=pd.merge(df_pair[['gene','
-                                        dfDAVID=DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=, ids_bg=name_id["gene_id"].tolist(), bgName = 'all_RNAseq_genes', listName = 'changed_genes')
+                                        dfDAVID=DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=name_id["gene_id"].tolist(), bgName = 'all_RNAseq_genes', listName = 'changed_genes')
                                         dfDAVID['sheet_name'] = sample1+'|'+sample2
                                         dfDAVID['file_name'] = _"+label+"_"+outshort+".xlsx"                                   
                                         DAVIDall=pd.concat([DAVIDall,dfDAVID])
@@ -702,6 +702,21 @@ for sig, label in zip(sig_choice,label_choice):
                 else:
                     df.to_csv(TSVout+label+'_'+outshort+'_ALL.tsv',sep="\t", index=False)
                 
+                if args.DAVID:
+                    if len(DAVIDall) > 0:
+                        file_names=list(set(DAVIDall['file_name'].tolist()))
+                        for f in file_names:
+                            dfFile=DAVIDall[DAVIDall['file_name']==f]
+                            catres=list(set(dfFile['categoryName'].tolist()))
+                            for c in catres:
+                                dfCAT=dfFile[dfFile['categoryName']==c]
+                                writerD = pd.ExcelWriter(python_output+'/'+c+f)    
+                                for sheet in list(set(dfCAT['sheet_name'].tolist())):
+                                    dfSHEET=dfCAT[dfCAT['sheet_name']==sheet]
+                                    dfSHEET.to_excel(writerD, sheet, index=False)                                        
+                                writerD.save()
+
+
         if sig != 'yes':
             if sig >= 1:
                 if args.TSV:
@@ -711,8 +726,9 @@ for sig, label in zip(sig_choice,label_choice):
 
             else:
                 if not args.TSVall:
-                    df.to_excel(writer, outshort+'_'+'ALL', index=False)
+                    df.to_excel(writer, outshort+'_'+'ALL', index=False) 
 
+            
     if sig != 'yes':
         if sig >= 1:
             if args.TSV:
@@ -723,31 +739,31 @@ for sig, label in zip(sig_choice,label_choice):
             if not args.TSVall:
                 writer.save()
 
-if args.DAVID:
-    DAVID_tmp_files=os.listdir(python_output)
-    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "DAVID" in s ]
-    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "tmp" in s ]
-    cat_to_exc=[]
-    for f in DAVID_tmp_files:
-        c=f.split(".")[1]
-        cat_to_exc.append(c)
-    cat_to_exc=list(set(cat_to_exc))
-    for c in cat_to_exc:
-        if not args.TSVall:
-            writer = pd.ExcelWriter(python_output+'/'+c+'.xlsx')
-        cat_files=[s for s in DAVID_tmp_files if c in s]
-        for f in cat_files:
-            df=pd.read_table(python_output+'/'+f)
-            sheet_name=f.split(".")[2]
-            if not args.TSVall:
-                df.to_excel(writer, sheet_name, index=False)
-            else:
-                df.to_csv(TSVout+c+sheet_name+'.tsv',sep="\t", index=False)
-        if not args.TSVall:
-            writer.save()
-
-    for f in DAVID_tmp_files:
-        os.remove(python_output+'/'+f)
+#if args.DAVID:
+#    DAVID_tmp_files=os.listdir(python_output)
+#    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "DAVID" in s ]
+#    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "tmp" in s ]
+#    cat_to_exc=[]
+#    for f in DAVID_tmp_files:
+#        c=f.split(".")[1]
+#        cat_to_exc.append(c)
+#    cat_to_exc=list(set(cat_to_exc))
+#    for c in cat_to_exc:
+#        if not args.TSVall:
+#            writer = pd.ExcelWriter(python_output+'/'+c+'.xlsx')
+#        cat_files=[s for s in DAVID_tmp_files if c in s]
+#        for f in cat_files:
+#            df=pd.read_table(python_output+'/'+f)
+#            sheet_name=f.split(".")[2]
+#            if not args.TSVall:
+#                df.to_excel(writer, sheet_name, index=False)
+#            else:
+#                df.to_csv(TSVout+c+sheet_name+'.tsv',sep="\t", index=False)
+#        if not args.TSVall:
+#            writer.save()
+#
+#    for f in DAVID_tmp_files:
+#        os.remove(python_output+'/'+f)
 
 
 print "\nDone"
