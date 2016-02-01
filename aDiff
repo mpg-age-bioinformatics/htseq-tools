@@ -759,5 +759,5 @@ for sig, label in zip(sig_choice,label_choice):
             if not args.TSVall:
                 writer.save()
 
-print "\n\n*************************************\nDeveloped by the Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing \n\nbioinformatcis@age.mpg.de\n\n"
+print "\n\n*************************************\nDeveloped by the Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing \n\nbioinformatics@age.mpg.de\n\n"
 sys.exit()
