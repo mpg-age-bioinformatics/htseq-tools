@@ -650,7 +650,7 @@ for sig, label in zip(sig_choice,label_choice):
 
                 if args.DAVID:
                     DAVIDall=pd.DataFrame()
-
+                    #ogtf=age.readGTF(original_gtf)
 
                 readyList=[]
 
@@ -684,7 +684,8 @@ for sig, label in zip(sig_choice,label_choice):
                                         dfDAVID=age.DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
                                         if dfDAVID is not None:
                                             dfDAVID['sheet_name'] = sample1+'|'+sample2
-                                            dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx"                                   
+                                            dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
+                                            #dfDAVID=age.id_nameDAVID(dfDAVID,ogtf)                                  
                                             DAVIDall=pd.concat([DAVIDall,dfDAVID])
                                         
                                         #DAVID_write(df_pair, name_id, sample1+'|'+sample2)
@@ -715,6 +716,8 @@ for sig, label in zip(sig_choice,label_choice):
                 
                 if args.DAVID:
                     if len(DAVIDall) > 0:
+                        print "Writing DAVID output tables"
+                        sys.stdout.flush()
                         file_names=list(set(DAVIDall['file_name'].tolist()))
                         for f in file_names:
                             dfFile=DAVIDall[DAVIDall['file_name']==f]
@@ -722,8 +725,14 @@ for sig, label in zip(sig_choice,label_choice):
                             for c in catres:
                                 dfCAT=dfFile[dfFile['categoryName']==c]
                                 writerD = pd.ExcelWriter(python_output+'/'+c+f)    
+                                print "\nDoing %s:" %(c+f)
+                                sys.stdout.flush()
                                 for sheet in list(set(dfCAT['sheet_name'].tolist())):
+                                    print sheet
+                                    sys.stdout.flush()
                                     dfSHEET=dfCAT[dfCAT['sheet_name']==sheet]
+                                    dfSHEET=age.id_nameDAVID(dfSHEET,name_id=name_id)
+                                    dfSHEET=dfSHEET.drop(['sheet_name','file_name'],axis=1)
                                     dfSHEET.to_excel(writerD, sheet, index=False)                                        
                                 writerD.save()
 
@@ -750,33 +759,5 @@ for sig, label in zip(sig_choice,label_choice):
             if not args.TSVall:
                 writer.save()
 
-#if args.DAVID:
-#    DAVID_tmp_files=os.listdir(python_output)
-#    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "DAVID" in s ]
-#    DAVID_tmp_files=[ s for s in DAVID_tmp_files if "tmp" in s ]
-#    cat_to_exc=[]
-#    for f in DAVID_tmp_files:
-#        c=f.split(".")[1]
-#        cat_to_exc.append(c)
-#    cat_to_exc=list(set(cat_to_exc))
-#    for c in cat_to_exc:
-#        if not args.TSVall:
-#            writer = pd.ExcelWriter(python_output+'/'+c+'.xlsx')
-#        cat_files=[s for s in DAVID_tmp_files if c in s]
-#        for f in cat_files:
-#            df=pd.read_table(python_output+'/'+f)
-#            sheet_name=f.split(".")[2]
-#            if not args.TSVall:
-#                df.to_excel(writer, sheet_name, index=False)
-#            else:
-#                df.to_csv(TSVout+c+sheet_name+'.tsv',sep="\t", index=False)
-#        if not args.TSVall:
-#            writer.save()
-#
-#    for f in DAVID_tmp_files:
-#        os.remove(python_output+'/'+f)
-
-
-print "\nDone"
-print "\n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
+print "\n\n*************************************\nDeveloped by the Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing \n\nbioinformatcis@age.mpg.de\n\n"
 sys.exit()
