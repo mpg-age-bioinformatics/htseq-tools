@@ -476,7 +476,7 @@ else:
     goterms=age.queryBM(data_filter,genes,data_output_goterms,args.dataset)
     goterms.columns=[data_filter,data_output_goterms[1],data_output_goterms[2]]
     bio_go=pd.merge(biotypes,goterms,on=data_filter,how="outer")
-    bio_go.to_csv(python_output+'/biotypes_go_raw.txt', quote=False, sep='\t', row_names=False)
+    bio_go.to_csv(python_output+'/biotypes_go_raw.txt', quote=False, index=False, sep='\t', row_names=False)
 
 
 # generate biotypes and go terms table using R/biomart output table.
@@ -563,7 +563,7 @@ if args.TSV:
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['g_name','KEGGid','pathIDs','pathName'])
+KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['gene_name','KEGGid','pathIDs','pathName'])
 KEGG.columns=['identifier','KEGG_ids','KEGG_pathIDS','KEGG_pathNames' ]
 
 for sig, label in zip(sig_choice,label_choice):
@@ -619,7 +619,8 @@ for sig, label in zip(sig_choice,label_choice):
             df = pd.merge(df,KEGG, how='left', on='identifier') 
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
-                gtf = pd.read_table(merged_fixed_gtf, sep='\t', comment="#", header=None, dtype=str)
+                gtf=age.readGTF(merged_fixed_gtf)
+                #gtf = pd.read_table(merged_fixed_gtf, sep='\t', comment="#", header=None, dtype=str)
                 t_id = age.retrieve_GTF_field('transcript_id',gtf)    
                 n_ref = age.retrieve_GTF_field('nearest_ref',gtf)
 
@@ -665,18 +666,26 @@ for sig, label in zip(sig_choice,label_choice):
                                         print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
                                         sys.stdout.flush()
                                         
-                                        targets = pd.merge(df_pair, name_id, how='left', left_on='identifier', right_on='gene_name')
-                                        targets = targets[['gene_id']].dropna()
-                                        targets = targets.gene_id.tolist()
-
-                                        background = all_genes_table[['gene_id']].dropna()
-                                        background = background.gene_id.tolist()
+                                        targets=name_id.copy()
+                                        targets.columns=['gene_name','targets']
                                         
+                                        background=targets['targets'].tolist()
+ 
+                                        targets = pd.merge(df_pair, targets, how='left', left_on='identifier', right_on='gene_name')
+                                        targets = targets[['targets']].dropna()
+                                        targets = targets['targets'].tolist()                                       
                                         
-                                        dfDAVID=DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=name_id["gene_id"].tolist(), bgName = 'all_RNAseq_genes', listName = 'changed_genes')
-                                        dfDAVID['sheet_name'] = sample1+'|'+sample2
-                                        dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx"                                   
-                                        DAVIDall=pd.concat([DAVIDall,dfDAVID])
+                                        #print DAVID_id
+                                        #print args.DAVIDcat
+                                        #print args.DAVIDuser
+                                        #print targets[:10]
+                                        #print background[:10]                                      
+ 
+                                        dfDAVID=age.DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
+                                        if dfDAVID is not None:
+                                            dfDAVID['sheet_name'] = sample1+'|'+sample2
+                                            dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx"                                   
+                                            DAVIDall=pd.concat([DAVIDall,dfDAVID])
                                         
                                         #DAVID_write(df_pair, name_id, sample1+'|'+sample2)
 
