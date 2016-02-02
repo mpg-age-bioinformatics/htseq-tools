@@ -40,8 +40,7 @@ if args.description:
     print "\nThis script annotates gene_exp.diff, promoters.diff, splicing.diff, cds.diff, and isoform_exp.diff cuffdiff tables. \
 It generates 1 file for all results, 1 file for p<0.05, and 1 file/input table for q<0.05. \nFor significant values (i.e. q<0.05) it also generates \
 tables containg all pair-wise comparisons in different sheets as well as gene ontology enrichment files for biological processes (BP), \
-cellular component (CC), and molecular function (MF).\n \nRequired python packages:\na) pip install --user pandas==0.15.2 \nb) pip \
-install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install --user suds==0.4 \ne) pip install --user openpyxl==2.1.4 \n \nRequired R packages: \nlibrary('biomaRt')\
+cellular component (CC), and molecular function (MF).\n \nRequired python packages:\na) pip install --user AGEpy \nb) pip install --user openpyxl==2.1.4 n\
  \n \nRequired arguments: \n-i, -o, -G, -C \n \nExample: \nannotate_cuffdiff_output.py -D -u John.Doe@age.mpg.de -i /path/to/cuffdiff_output_folder \
 -G /path/to/original.gtf -C /path/to/merged_and_compared.gtf -o /path/to/python_output_folder\
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
@@ -49,246 +48,14 @@ install --user numpy==1.9.2 \nc) pip install --user rpy2==2.5.6 \nd) pip install
 
 import pandas as pd
 import numpy as np
-#import rpy2.robjects as robjects
-#from rpy2.robjects.packages import importr
 import time
 from datetime import datetime
 import shutil
-from urllib import urlopen
+#from urllib import urlopen
 import AGEpy.AGEpy as age
 
 
 ############### FUNCTIONS ############
-"""
-def retrieve_GTF_field(field,gtf):
-    field = pd.DataFrame(gtf[8].str.split(field).tolist())[1]
-    field = field.astype(str)
-    field = pd.DataFrame(field.str.split(';',1).tolist())
-    field = pd.DataFrame(field[0].str.split('"').tolist())[1]
-    field = pd.DataFrame(field)
-    return field
-
-def list_KEGG_organisms():
-    organisms=urlopen("http://rest.kegg.jp/list/organism").read()
-    organisms=organisms.split("\n")
-    for o in organisms:
-        o=o.split("\t")
-        print str(o[1]), str(o[2])
-        sys.stdout.flush()
-
-def find_KEGG_ensemblDB(organism,ens_ids):
-    all_genes=urlopen("http://rest.kegg.jp/list/"+organism).read()
-    all_genes=all_genes.split("\n")
-    dbs=[]
-    while len(dbs) == 0:
-        for g in all_genes:
-            if len(dbs) == 0:
-                kid = g.split("\t")[0]
-                gene=urlopen("http://rest.kegg.jp/get/"+kid).read()
-                DBLINKS=gene.split("\n")
-                DBLINKS=[ s for s in DBLINKS if ":" in s ]
-                for d in DBLINKS:
-                    test=d.split(" ")
-                    test=test[len(test)-1]
-                    if test in ens_ids:
-                        DBLINK=[ s for s in DBLINKS if test in s ]
-                        DBLINK=DBLINK[0].split(":")
-                        DBLINK=DBLINK[len(DBLINK)-2]
-                        dbs.append(DBLINK)
-            else:
-                break
-    ens_db=dbs[0].split(" ")
-    ens_db=ens_db[len(ens_db)-1]
-    test_db=urlopen("http://rest.genome.jp/link/"+ens_db+"/"+organism).read()
-    test_db=test_db.split("\n")
-    if len(test_db) == 1:
-        print "For "+organism+" the following db was found: "+ens_db
-        print "This database does not seem to be valid KEGG-linked database identifier"
-        print "For \n'hsa' use 'ensembl-hsa'\n'mmu' use 'ensembl-mmu'\n'cel' use 'EnsemblGenomes-Gn'\n'dme' use 'FlyBase'" 
-        sys.stdout.flush()
-    else:
-        print "For "+organism+" the following db was found: "+ens_db
-        sys.stdout.flush()
-    return ens_db
-
-def ensembl_to_kegg(organism,ens_db):
-    print "KEGG API: http://rest.genome.jp/link/"+ens_db+"/"+organism
-    sys.stdout.flush()
-    kegg_ens=urlopen("http://rest.genome.jp/link/"+ens_db+"/"+organism).read()
-    kegg_ens=kegg_ens.split("\n")
-    final=[]
-    for i in kegg_ens:
-        final.append(i.split("\t"))
-    df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
-    ens_id=pd.DataFrame(df[1].str.split(":").tolist())[1]
-    df=pd.concat([df,ens_id],axis=1)
-    df.columns=['KEGGid','ensDB','ENSid']
-    df=df[['KEGGid','ENSid']]
-    return df
-    
-def KEGG_paths(organism):
-    print "KEGG API: http://rest.kegg.jp/list/pathway/"+organism
-    sys.stdout.flush()
-    kegg_paths=urlopen("http://rest.kegg.jp/list/pathway/"+organism).read()
-    kegg_paths=kegg_paths.split("\n")
-    final=[]
-    for k in kegg_paths:
-        final.append(k.split("\t"))
-    df=pd.DataFrame(final[0:len(final)-1])[[0,1]]
-    df.columns=['pathID','pathName']
-    print "Collecting genes for " + str(len(df)) + " pathways"
-    sys.stdout.flush()
-    df_pg=pd.DataFrame()
-    for i in df['pathID'].tolist():
-        print i+" ",
-        sys.stdout.flush()
-        path_genes=urlopen("http://rest.kegg.jp/link/genes/"+i).read()
-        path_genes=path_genes.split("\n")
-        final=[]
-        for k in path_genes:
-            final.append(k.split("\t"))
-        final.pop()
-        if len(final[0]) is not 2:
-          print " skipped (no genes found in data)"
-          continue
-        print str(len(final)) + " gene(s) assigned"
-        df_tmp=pd.DataFrame(final[0:len(final)])[[0,1]]
-        df_tmp.columns=['pathID','KEGGid']
-        df_pg=pd.concat([df_pg,df_tmp])
-    df=pd.merge(df,df_pg,on=["pathID"], how="outer")
-    KEGGids=list(set(df['KEGGid'].tolist()))
-    print "Merging final table"
-    sys.stdout.flush()
-    df_final=pd.DataFrame()
-    for k in KEGGids:
-        df_tmp=df[df['KEGGid']==k]
-        pathIDs=", ".join(df_tmp['pathID'].tolist())
-        pathName=", ".join(df_tmp['pathName'].tolist())
-        d={'KEGGid':k,'pathIDs':pathIDs,'pathName':pathName}
-        df_tmp=pd.DataFrame(d,index=[0])
-        df_final=pd.concat([df_final,df_tmp])
-    df_final=df_final.dropna()
-    return df_final
-
-def DAVIDenrich(listF, idType, bgF='', resF='', bgName = 'Background1',listName='List1', category = '', thd=0.1, ct=2):
-    # adapted from HuangYi @ 20110424 as available on https://david.ncifcrf.gov
-    #import ssl
-    #ssl._create_default_https_context = ssl._create_unverified_context
-    from suds.client import Client
-    import os
-    import ssl # fix
-    ssl._create_default_https_context = ssl._create_unverified_context # fix
-
-    if len(listF) > 0 and os.path.exists(listF):
-        inputListIds = ','.join(open(listF).read().split('\n'))
-        print 'List loaded.'
-        sys.stdout.flush()
-    else:
-        print 'No list loaded.'
-        sys.stdout.flush()
-        raise
-
-    flagBg = False
-    if len(bgF) > 0 and os.path.exists(bgF):
-        inputBgIds = ','.join(open(bgF).read().split('\n'))
-        flagBg = True
-        print 'Use file background.'
-        sys.stdout.flush()
-    else:
-        print 'Use default background.'
-        sys.stdout.flush()
-    
-    client = Client('https://david.ncifcrf.gov/webservice/services/DAVIDWebService?wsdl') # new https url
-    client.wsdl.services[0].setlocation('https://david.ncifcrf.gov/webservice/services/DAVIDWebService.DAVIDWebServiceHttpSoap11Endpoint/') # fix
-    print 'User Authentication:',client.service.authenticate(args.DAVIDuser)
-    sys.stdout.flush()
-
-    listType = 0
-    size=client.service.addList(inputListIds,idType,listName,listType)
-    #print 'Percentage mapped(list):', client.service.addList(inputListIds,idType,listName,listType)
-    print 'Percentage mapped(list): %s' %str(size)
-    sys.stdout.flush()
-    if float(size) > float(0):
-
-        if flagBg:
-            listType = 1
-            print 'Percentage mapped(background):', client.service.addList(inputBgIds,idType,bgName,listType)
-            sys.stdout.flush()
-
-        print 'Use categories:', client.service.setCategories(category)
-        sys.stdout.flush()
-
-        chartReport = client.service.getChartReport(thd,ct)
-        chartRow = len(chartReport)
-        print 'Total chart records:',chartRow
-        sys.stdout.flush()
-
-        if len(resF) == 0 or not os.path.exists(resF):
-            if flagBg:
-                resF = listF + '.withBG.chartReport'
-            else:
-                resF = listF + '.chartReport'
-        with open(resF, 'w') as fOut:
-            fOut.write('Category\tTerm\tCount\t%\tPvalue\tGenes\tList Total\tPop Hits\tPop Total\tFold Enrichment\tBonferroni\tBenjamini\tFDR\n')
-            for row in chartReport:
-                rowDict = dict(row)
-                categoryName = str(rowDict['categoryName'])
-                termName = str(rowDict['termName'])
-                listHits = str(rowDict['listHits'])
-                percent = str(rowDict['percent'])
-                ease = str(rowDict['ease'])
-                Genes = str(rowDict['geneIds'])
-                listTotals = str(rowDict['listTotals'])
-                popHits = str(rowDict['popHits'])
-                popTotals = str(rowDict['popTotals'])
-                foldEnrichment = str(rowDict['foldEnrichment'])
-                bonferroni = str(rowDict['bonferroni'])
-                benjamini = str(rowDict['benjamini'])
-                FDR = str(rowDict['afdr'])
-                rowList = [categoryName,termName,listHits,percent,ease,Genes,listTotals,popHits,popTotals,foldEnrichment,bonferroni,benjamini,FDR]
-                fOut.write('\t'.join(rowList)+'\n')
-            print 'write file:', resF, 'finished!'
-            sys.stdout.flush()
-
-def DAVID_get(cat, filtered_table, all_genes_table):
-    IDs_table = pd.merge(filtered_table, all_genes_table, how='left', left_on='identifier', right_on='g_name')
-    IDs_table = IDs_table[['g_id']].dropna()
-    IDs_table.to_csv('targets_tmp.txt',sep='\t',header=False,index=False)
-
-    background = all_genes_table[['g_id']].dropna()
-    background.to_csv('background_tmp.txt',sep='\t',header=False,index=False)
-
-    DAVIDenrich(listF = './targets_tmp.txt', bgF = './background_tmp.txt', idType = DAVID_id, bgName = 'all_RNAseq_genes', listName = 'changed_genes', category = cat)
-    if os.path.isfile('targets_tmp.txt.withBG.chartReport'):
-        enrich=pd.read_csv('targets_tmp.txt.withBG.chartReport',sep='\t')
-        os.remove('targets_tmp.txt.withBG.chartReport')
-        terms=enrich['Term'].tolist()
-        enrichN=pd.DataFrame()
-        for term in terms:
-            tmp=enrich[enrich['Term']==term]
-            tmp=tmp.reset_index(drop=True)
-            ids=tmp.xs(0)['Genes']
-            ids=pd.DataFrame(data=ids.split(", "))
-            ids.columns=['g_id']
-            ids['g_id']=ids['g_id'].map(str.lower)
-            all_genes_table['g_id']=all_genes_table['g_id'].map(str.lower)
-            ids=pd.merge(ids, all_genes_table, how='left', left_on='g_id', right_on='g_id')
-            names=ids['g_name'].tolist()
-            names = ', '.join(names)
-            tmp=tmp.replace(to_replace=tmp.xs(0)['Genes'], value=names)
-            enrichN=pd.concat([enrichN, tmp])
-        enrichN=enrichN.reset_index(drop=True)
-
-    else:
-        enrichN=pd.DataFrame()
-
-    os.remove('targets_tmp.txt')
-    os.remove('background_tmp.txt')
-
-    return enrichN
-
-"""
-
 
 if args.listMarts:
     print(age.databasesBM())
@@ -316,7 +83,6 @@ if args.findKEGGdb:
     gtf=age.readGTF(os.path.realpath(args.originalGTF))
     print "GTF imported"
     sys.stdout.flush()
-    #gtf = gtf.astype(str)
     gene_id = age.retrieve_GTF_field('gene_id',gtf)
     gene_id = gene_id['gene_id'].tolist()
     print(age.databasesKEGG(args.KEGGorg,gene_id))
@@ -385,23 +151,11 @@ in_files=in_files.split()
 out_labels=args.shortOutputName
 out_labels=out_labels.split()
 
-out_biot=args.outputBiotypes
-out_biot=out_biot.split()
+data_output_biotypes=args.outputBiotypes
+data_output_biotypes=data_output_biotypes.split()
 
-out_go=args.outputGoterms
-out_go=out_go.split()
-
-############### Set Biomart resources ######################
-dataset = args.dataset
-data_filter = args.filter # filter for gene_id in GTF file, 'link_ensembl_gene_id'
-data_output_biotypes = out_biot # order needs to be kept i.e. id, biotype
-data_output_goterms = out_go # order needs to be kept i.e. id, go_id, go_name
-############################################################
-
-############### Check DAVID's ID for your set ######################
-# http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list
-DAVID_id=args.DAVIDid
-####################################################################
+data_output_goterms=args.outputGoterms
+data_output_goterms=data_output_goterms.split()
 
 ###################### START #####################
 
@@ -430,11 +184,9 @@ else:
     print "Imported list of differentially regulated genes"
     sys.stdout.flush()
 
-    #gtf = pd.read_table(original_gtf, sep='\t', comment="#", header=None, dtype=str)
     gtf=age.readGTF(original_gtf)
     print "GTF imported"
     sys.stdout.flush()
-    #gtf = gtf.astype(str)
 
     gene_name = age.retrieve_GTF_field('gene_name',gtf)
     print "Read gene names from GTF"
@@ -445,7 +197,6 @@ else:
     sys.stdout.flush()
 
     name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
-    #name_id.columns = ['g_name','g_id']
     name_id = name_id[name_id['gene_name'].isin(genes)]
     print "Generated Names/IDs table"
     sys.stdout.flush()
@@ -471,11 +222,11 @@ elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
 else:
     print "\nRetrieving biotypes and gene ontoloy information"
     sys.stdout.flush()
-    biotypes=age.queryBM(data_filter,genes,data_output_biotypes,args.dataset)
-    biotypes.columns=[data_filter,data_output_biotypes[1]]
-    goterms=age.queryBM(data_filter,genes,data_output_goterms,args.dataset)
-    goterms.columns=[data_filter,data_output_goterms[1],data_output_goterms[2]]
-    bio_go=pd.merge(biotypes,goterms,on=data_filter,how="outer")
+    biotypes=age.queryBM(args.filter ,genes,data_output_biotypes,args.dataset)
+    biotypes.columns=[args.filter ,data_output_biotypes[1]]
+    goterms=age.queryBM(args.filter ,genes,data_output_goterms,args.dataset)
+    goterms.columns=[args.filter ,data_output_goterms[1],data_output_goterms[2]]
+    bio_go=pd.merge(biotypes,goterms,on=args.filter ,how="outer")
     bio_go.to_csv(python_output+'/biotypes_go_raw.txt', quote=False, index=False, sep='\t', row_names=False)
 
 
@@ -543,10 +294,8 @@ elif os.path.isfile(python_output+'/KEGG.txt'):
 else:
     print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
     sys.stdout.flush()
-    #names_KEGGids=age.idsKEGG(args.KEGGorg)
     kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
     paths = age.pathwaysKEGG(args.KEGGorg)
-    #paths=KEGG_paths(args.KEGGorg)
     df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')    
     df=df[['ENSid','KEGGid','pathIDs','pathName']]
     df.columns=['gene_id','KEGGid','pathIDs','pathName']
@@ -624,7 +373,6 @@ for sig, label in zip(sig_choice,label_choice):
                 n_ref = age.retrieve_GTF_field('nearest_ref',gtf)
 
                 id_ref = pd.concat([t_id, n_ref], axis=1).drop_duplicates()
-                #id_ref.columns = ['transcript_id','nearest_ref']
 
                 df = pd.merge(id_ref, df, how='right', left_on='transcript_id', right_on='test_id')
 
@@ -641,7 +389,6 @@ for sig, label in zip(sig_choice,label_choice):
 
                 if args.DAVID:
                     DAVIDall=pd.DataFrame()
-                    #ogtf=age.readGTF(original_gtf)
 
                 readyList=[]
 
@@ -666,7 +413,7 @@ for sig, label in zip(sig_choice,label_choice):
                                         targets = targets[['targets']].dropna()
                                         targets = targets['targets'].tolist()                                       
                                         if len(targets) > 0: 
-                                            dfDAVID=age.DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
+                                            dfDAVID=age.DAVIDenrich(args.DAVIDid, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
                                             if dfDAVID is not None:
                                                 dfDAVID['sheet_name'] = sample1+'|'+sample2
                                                 dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
@@ -681,8 +428,6 @@ for sig, label in zip(sig_choice,label_choice):
                                         df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
                                     else:                                
                                         df_pair.to_csv(TSVout+label+'_'+outshort+'_'+sample1+'_vs_'+sample2+'.tsv',sep="\t", index=False)                                    
-
-
 
             df.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
 
