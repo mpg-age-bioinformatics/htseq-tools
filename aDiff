@@ -620,7 +620,6 @@ for sig, label in zip(sig_choice,label_choice):
 
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf=age.readGTF(merged_fixed_gtf)
-                #gtf = pd.read_table(merged_fixed_gtf, sep='\t', comment="#", header=None, dtype=str)
                 t_id = age.retrieve_GTF_field('transcript_id',gtf)    
                 n_ref = age.retrieve_GTF_field('nearest_ref',gtf)
 
@@ -631,14 +630,6 @@ for sig, label in zip(sig_choice,label_choice):
 
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
-
-                #def DAVID_write(table_of_interest, name_vs_id_table, sheet_name):
-                #    if len(table_of_interest.index) >= 1:
-                #        enr = DAVID_get(args.DAVIDcat, table_of_interest, name_vs_id_table)
-                #        if len(enr.index) >= 1:
-                #            recovered_cats=list(set(enr['Category'].tolist()))
-                #            for c in recovered_cats:
-                #                enr[enr['Category']==c].to_csv(python_output+"/DAVID."+c+"_"+label+"_"+outshort+"."+sheet_name+".tmp",index=False, sep="\t")
 
                 sample1 = df[['sample_1']]
                 sample1.columns=['samples']
@@ -674,21 +665,12 @@ for sig, label in zip(sig_choice,label_choice):
                                         targets = pd.merge(df_pair, targets, how='left', left_on='identifier', right_on='gene_name')
                                         targets = targets[['targets']].dropna()
                                         targets = targets['targets'].tolist()                                       
-                                        
-                                        #print DAVID_id
-                                        #print args.DAVIDcat
-                                        #print args.DAVIDuser
-                                        #print targets[:10]
-                                        #print background[:10]                                      
- 
-                                        dfDAVID=age.DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
-                                        if dfDAVID is not None:
-                                            dfDAVID['sheet_name'] = sample1+'|'+sample2
-                                            dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
-                                            #dfDAVID=age.id_nameDAVID(dfDAVID,ogtf)                                  
-                                            DAVIDall=pd.concat([DAVIDall,dfDAVID])
-                                        
-                                        #DAVID_write(df_pair, name_id, sample1+'|'+sample2)
+                                        if len(targets) > 0: 
+                                            dfDAVID=age.DAVIDenrich(DAVID_id, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
+                                            if dfDAVID is not None:
+                                                dfDAVID['sheet_name'] = sample1+'|'+sample2
+                                                dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
+                                                DAVIDall=pd.concat([DAVIDall,dfDAVID])
 
                                     df_pair.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
 
