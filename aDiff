@@ -34,6 +34,7 @@ parser.add_argument("--KEGGdb", help="KEGG database linked to your ensembl organ
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list", default='WORMBASE_GENE_ID')
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list.", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
+parser.add_argument("--AGEpy", help="Install AGEpy package with pip") 
 args = parser.parse_args()
 
 if args.description:
@@ -46,14 +47,29 @@ cellular component (CC), and molecular function (MF).\n \nRequired python packag
 \n\n*************************************\nDeveloped by Jorge Boucas at the group for Computational RNA Biology and Ageing of the Max Planck Institute for Biology of Ageing \n\njorge.boucas@age.mpg.de\n\n"
     sys.exit(0)
 
+try:
+    import AGEpy.AGEpy as age
+except ImportError:
+    print "You don't have AGEpy package installed.\nFollow the instructions on https://github.com/mpg-age-bioinformatics/AGEpy to install this package or use 'aDiff --AGEpy' to install it with pip."
+    sys.exit(0)
+
+if args.AGEpy:
+    try:
+        import pip
+        print "With --AGEpy, only the AGEpy package and it's dependencies will be installed no analysis will performed"
+        sys.stdout.flush()
+        pip.main(['install','--user','AGEpy'])
+        sys.exit(0)
+    except ImportError:
+        print "You don't have pip.\nPlease install pip first."
+        sys.stdout.flush()
+        sys.exit(0)
+
 import pandas as pd
 import numpy as np
 import time
 from datetime import datetime
 import shutil
-#from urllib import urlopen
-import AGEpy.AGEpy as age
-
 
 ############### FUNCTIONS ############
 
