@@ -23,10 +23,10 @@ parser.add_argument("--mart", help="Your mart of choice.", default='ENSEMBL_MART
 parser.add_argument("--listDatasets", help="List datasets for your mart", action="store_true")
 parser.add_argument("--dataset", help="Dataset of your choice.", default='celegans_gene_ensembl')
 parser.add_argument("--listFilters", help="List available filters", action="store_true")
-parser.add_argument("--filter", help="Filter to use to identify your genes.", default='wormbase_gene')
+parser.add_argument("--filter", help="Filter to use to identify your genes.", default='ensembl_gene_id')
 parser.add_argument("--listAttributes", help="List available attributes for your dataset.", action="store_true")
 parser.add_argument("--outputBiotypes", help="Outputs/attributes for your biotypes data. Order has to be kept, ie. first IDs then biotype.", default='ensembl_gene_id gene_biotype')
-parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='wormbase_gene go_id name_1006')
+parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='ensembl_gene_id go_id name_1006')
 parser.add_argument("--listKEGGorganisms", help="List KEGG organisms.", action="store_true")
 parser.add_argument("--KEGGorg", help="KEGG organism.", default='cel')
 parser.add_argument("--findKEGGdb", help="KEGG has DB identifier for each linked DB. Use this function to find the label of your DB, eg: 'ensembl-hsa', 'FlyBase'. This option requires --originalGTF and --KEGGorg", action="store_true")
@@ -74,19 +74,19 @@ import shutil
 ############### FUNCTIONS ############
 
 if args.listMarts:
-    print(age.databasesBM())
+    print(age.RdatabasesBM())
     sys.exit(0)
 
 if args.listDatasets:
-    print(age.datasetsBM())
+    print(age.RdatasetsBM(args.mart))
     sys.exit(0)
 
 if args.listFilters:
-    print(age.filtersBM(args.dataset))
+    print(age.RfiltersBM(args.dataset,args.mart))
     sys.exit(0)
 
 if args.listAttributes:
-    print(age.attributesBM(args.dataset))
+    print(age.RattributesBM(args.dataset,args.mart))
     sys.exit(0)
 
 if args.listKEGGorganisms:
@@ -236,12 +236,12 @@ elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
     sys.stdout.flush()
 
 else:
-    print "\nRetrieving biotypes and gene ontoloy information"
+    print "\nRetrieving biotypes and gene ontology information"
     sys.stdout.flush()
-    biotypes=age.queryBM(args.filter ,genes,data_output_biotypes,args.dataset)
+    biotypes=age.RqueryBM(args.filter,genes,data_output_biotypes,args.dataset,args.mart)
     biotypes.columns=[args.filter ,data_output_biotypes[1]]
-    goterms=age.queryBM(args.filter ,genes,data_output_goterms,args.dataset)
-    goterms.columns=[args.filter ,data_output_goterms[1],data_output_goterms[2]]
+    goterms=age.RqueryBM(args.filter,genes,data_output_goterms,args.dataset,args.mart)
+    goterms.columns=[args.filter,data_output_goterms[1],data_output_goterms[2]]
     bio_go=pd.merge(biotypes,goterms,on=args.filter ,how="outer")
     bio_go.to_csv(python_output+'/biotypes_go_raw.txt', quote=False, index=False, sep='\t', row_names=False)
 
