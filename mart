@@ -131,7 +131,7 @@ D <- lapply(arg$input, function (i) {
   d <- switch(arg$input_format,
               tsv = read.delim(i, stringsAsFactors = F),
               csv = read.csv(i, stringsAsFactors = F),
-              xls = read_xl(i))
+              xls = read_excel(i))
   cat("OK\n")
   
   if (!arg$input_column %in% names(d)) stop("could not find column '", arg$input_column, "'")
