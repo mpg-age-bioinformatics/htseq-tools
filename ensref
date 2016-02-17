@@ -273,7 +273,11 @@ do
   # label_gtf=${gtf#original.}
   # label_gtf=${label_gtf%.gtf}
   # [[ -z $label_gtf ]] && label_gtf="default"
-  for fa in original.*.fa
+  
+  #for fa in original.*.fa
+  # restrict to toplevel/primary_assembly
+  # 'alt' is not explained
+  for fa in original.toplevel.fa original.primary_assembly.fa
   do
     label_fa=${fa#original.}
     label_fa=${label_fa%.fa}
