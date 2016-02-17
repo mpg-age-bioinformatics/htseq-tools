@@ -419,6 +419,16 @@ echo done
     ### tophat2_cuffcompare
     #######
   
+    # NOTE:
+    # cuffcompare error 'Warning: could not parse ID or Parent from GFF line'
+    # can be ignored/bypassed with dropping 'gene' features from the gtf file
+    # e.g. 
+    # awk -F '\t' '{if ($3 != "gene") print $0}' $gtf > ${gtf}.tmp
+    # see the question
+    # https://www.biostars.org/p/126423/
+    # and solution
+    # https://groups.google.com/forum/#!msg/tuxedo-tools-users/FTKA4qozJIc/p47AwnCXxvwJ
+
     name=${label_fa}_tophat2_cuffcompare
     if [[ -d $name ]]
     then
@@ -476,6 +486,7 @@ cd $name
 for f in *
 do
   [[ \$f =~ ^index\.fa ]] && continue
+  [[ -d \$f ]] && continue
   mv \$f \${f/#index/index.fa}
 done
 echo done
