@@ -220,6 +220,10 @@ BUILD=${BUILD%%.*}
 touch BUILD_${BUILD}_RELEASE_${RELEASE}
 
 echo "* downloading and extracting"
+
+echo "  README (gtf)"
+curl -# $URL_GTF/README > README_gtf
+
 for FILE in ${FILES_GTF[@]}
 do
   FILE_UNZIP=${FILE%%.gz}
@@ -231,6 +235,9 @@ do
   srun gunzip $FILE
   mv $FILE_UNZIP $FILE_REBASED
 done
+
+echo "  README (fasta)"
+curl -# $URL_DNA/README > README_fa
 
 mkdir -p chromosomes
 for FILE in ${FILES_DNA[@]}
