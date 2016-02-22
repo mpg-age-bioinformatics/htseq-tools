@@ -155,13 +155,22 @@ Rscript QC.R cuffdiff_output_folder cummeRbund_output_folder
 
 #### SNPsFilter
 
-This executable interactive python scripts lets you merge *.tabular files outputed by [CloudMap](http://usegalaxy.org/cloudmap) and filter SNPs of interest based on the maximum number of samples containing the SNP and minimum number of SNPs per gene.
+This executable interactive python scripts lets you merge `*.tabular files 
+outputed by [CloudMap](http://usegalaxy.org/cloudmap) and filter SNPs of 
+interest based on the maximum number of samples containing the SNP and minimum
+number of SNPs per gene.
 
 Usage:
 
 ```
 SNPsFilter
 ```
+
+#### meran-slurm.sh
+
+A HPC/slurm pipeline to perform RNA methylation analysis.
+Modify the sample sheet and path variables at the beginning of the script.
+Run script on trimmed read data. Submit in slurm environment.
 
 ## License
 
