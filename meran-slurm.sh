@@ -8,21 +8,26 @@
 # USER INPUT
 ############
 
+# root project directory to put output folder into
+home=/path/to/base/directory
+
+# notification mail address
+email=mail@foo.bar
+
 # path to meRanTK software v 1.1.1a
 path_meran=software/meRanTK
 # path to samtools binary, script is compatible with version 0.1.18
 bin_sam=$path_meran/extutil/x86_64-linux-thread-multi/tophat2/samtools_0.1.18
-# root project directory to put output folder into
-home=/path/to/base/directory
+
 # reference genome fasta and gff files from tophat2 transcriptome assembly
 index_fa=/beegfs/common/genomes/homo_sapiens/83/toplevel_tophat2/index.fa
 index_gtf=/beegfs/common/genomes/homo_sapiens/83/toplevel_tophat2/index.fa.gff
-# notification mail address
-email=mail@foo.bar
+
 # sample 'sheet' - to create use e.g. vim with ':r! ls reads_trim/*' for example
 samples="
 # comment lines start with '#' and are ignored
 # empty lines are ignored
+# fields are white-space separeated
 
 # sample information as
 # 1) group = group identifier, must contain 2 different in total
@@ -74,7 +79,7 @@ submit_sbatch () {
 }
 
 unset dep dep2
-unset samples_group samples_name samples_fq1 samples_fq2 
+unset samples_group samples_name samples_fq1 samples_fq2
 unset samples_name_uniq samples_name_a samples_name_b
 
 cd $home
@@ -127,7 +132,7 @@ printf '%s\n' "${samples[@]}" | column -t | tee meran_compare/$comparison/sample
 
 sbatch="#!/bin/bash
 #SBATCH -n 18
-#SBATCH -o slurm/meran_index/index.stdout
+#SBATCH -o slurm/meran_index/index.out
 #SBATCH -J meran_index
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=$email
@@ -161,7 +166,7 @@ do
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 18
-#SBATCH -o slurm/meran_align/${name}.stdout
+#SBATCH -o slurm/meran_align/${name}.out
 #SBATCH -J meran_align_$name
 #SBATCH -d afterok:$dep
 #SBATCH --mail-type=FAIL
@@ -193,7 +198,7 @@ $bin_sam index meran_align/$name/aligned_sorted.bam meran_align/$name/aligned_so
 #SBATCH -N 1
 #SBATCH -n 1
 #SBATCH -c 38
-#SBATCH -o slurm/meran_call/${name}.stdout
+#SBATCH -o slurm/meran_call/${name}.out
 #SBATCH -J meran_call_$name
 #SBATCH -d afterok:$pid
 #SBATCH --mail-type=FAIL
@@ -228,7 +233,7 @@ files_b=($(printf 'meran_call/%s_FDR_0.05.txt ' ${files_b[@]}))
 files_b=$(cat_array ${files_b[@]})
 
 sbatch="#!/bin/bash
-#SBATCH -o slurm/meran_compare/${comparison}.stdout
+#SBATCH -o slurm/meran_compare/${comparison}.out
 #SBATCH -J meran_compare_$comparison
 #SBATCH -d afterok$dep2
 #SBATCH --mail-type=FAIL
@@ -251,13 +256,14 @@ pid=$(submit_sbatch slurm/meran_compare/$comparison "$sbatch")
 pid=$(sbatch << EOF
 #!/bin/bash
 #SBATCH -o /dev/null
-#SBATCH -J meran-slurm-notify
+#SBATCH -J meran-slurm-notification
 #SBATCH --mail-type=END
 #SBATCH --mail-user=$email
-#SBATCH -d afterok:$pid
+#SBATCH -d afterany:$pid
 echo done
 EOF
 )
 
-echo "* done - notification email will be send to '$email' (after last job ended or if any job failed)"
+echo "* done - notification email will be send to '$email'"
+echo "  (after last job ended and if any job failed)"
 
