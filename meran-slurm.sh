@@ -182,7 +182,7 @@ $path_meran/meRanT align -t 18 \
 
 if [[ ! -f meran_align/$name/aligned_cut.sam ]]; then cut -f1-11 meran_align/$name/aligned.sam > meran_align/$name/aligned_cut.sam; fi
 if [[ ! -f meran_align/$name/aligned.bam ]]; then $bin_sam view -bS -o meran_align/$name/aligned.bam meran_align/$name/aligned_cut.sam; fi
-if [[ ! -f meran_align/$name/aligned_sorted.bam ]]; then $bin_sam sort meran_align/$name/aligned.bam meran_align/$name/aligned_sorted.bai; fi
+if [[ ! -f meran_align/$name/aligned_sorted.bam ]]; then $bin_sam sort meran_align/$name/aligned.bam meran_align/$name/aligned_sorted; fi
 $bin_sam index meran_align/$name/aligned_sorted.bam meran_align/$name/aligned_sorted.bai
 "
 
