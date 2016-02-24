@@ -236,7 +236,7 @@ sbatch="#!/bin/bash
 #SBATCH -o slurm/meran_compare/${comparison}.out
 #SBATCH -J meran_compare_$comparison
 #SBATCH -d afterok$dep2
-#SBATCH --mail-type=FAIL
+#SBATCH --mail-type=END
 #SBATCH --mail-user=$email
 
 cd meran_compare/$comparison
@@ -248,21 +248,6 @@ $path_meran/meRanCompare \
 "
 
 pid=$(submit_sbatch slurm/meran_compare/$comparison "$sbatch")
-
-##########
-# notify
-#########
-
-pid=$(sbatch << EOF
-#!/bin/bash
-#SBATCH -o /dev/null
-#SBATCH -J meran-slurm-notification
-#SBATCH --mail-type=END
-#SBATCH --mail-user=$email
-#SBATCH -d afterany:$pid
-echo done
-EOF
-)
 
 echo "* done - notification email will be send to '$email'"
 echo "  (after last job ended and if any job failed)"
