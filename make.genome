@@ -12,6 +12,7 @@ multifasta=os.path.realpath(str(args.multifasta))
 output=args.output_file
 
 def write_fasta(fasta_in,output):
+    f2=open(output,'w')
     with open(fasta_in, 'r+') as f:
         sys.stdout.flush()
         lines = f.readlines()
@@ -27,26 +28,25 @@ def write_fasta(fasta_in,output):
                 s=i
                 code=['N','A','C','T','G']
                 firstbase=lines[s+1][0]
-                f2=open(output,'w')
                 while firstbase in code:
                     s=s + 1
                     seq=seq+lines[s]
                     if s < len(lines)-1:
                         firstbase=lines[s+1][0]
                     else:
-                        f2.write(str(fChr)+"\t"+str(len(seq)))
-                        print str(fChr)+"\t"+str(len(seq))
-                        sys.stdout.flush()
-                        f2.close
-                        sys.exit(0)
+                        firstbase="!"
+                    #else:
+                    #    f2.write(str(fChr)+"\t"+str(len(seq)))
+                    #    print str(fChr)+"\t"+str(len(seq))
+                    #    sys.stdout.flush()
+                    #    sys.exit(0)
                                                 
-                f2.write(str(fChr)+"\t"+str(len(seq)))
+                f2.write(str(fChr)+"\t"+str(len(seq))+"\n")
                 print str(fChr)+"\t"+str(len(seq))
                 sys.stdout.flush()
                 i=s
             else:
                 i=i+1
-
-        f2.close
+    f2.close
                     
 write_fasta(multifasta,output)
