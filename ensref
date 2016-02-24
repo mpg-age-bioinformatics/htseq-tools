@@ -220,6 +220,10 @@ BUILD=${BUILD%%.*}
 touch BUILD_${BUILD}_RELEASE_${RELEASE}
 
 echo "* downloading and extracting"
+
+echo "  README (gtf)"
+curl -# $URL_GTF/README > README_gtf
+
 for FILE in ${FILES_GTF[@]}
 do
   FILE_UNZIP=${FILE%%.gz}
@@ -231,6 +235,9 @@ do
   srun gunzip $FILE
   mv $FILE_UNZIP $FILE_REBASED
 done
+
+echo "  README (fasta)"
+curl -# $URL_DNA/README > README_fa
 
 mkdir -p chromosomes
 for FILE in ${FILES_DNA[@]}
@@ -266,7 +273,11 @@ do
   # label_gtf=${gtf#original.}
   # label_gtf=${label_gtf%.gtf}
   # [[ -z $label_gtf ]] && label_gtf="default"
-  for fa in original.*.fa
+  
+  #for fa in original.*.fa
+  # restrict to toplevel/primary_assembly
+  # 'alt' is not explained
+  for fa in original.toplevel.fa original.primary_assembly.fa
   do
     label_fa=${fa#original.}
     label_fa=${label_fa%.fa}
@@ -408,6 +419,16 @@ echo done
     ### tophat2_cuffcompare
     #######
   
+    # NOTE:
+    # cuffcompare error 'Warning: could not parse ID or Parent from GFF line'
+    # can be ignored/bypassed with dropping 'gene' features from the gtf file
+    # e.g. 
+    # awk -F '\t' '{if ($3 != "gene") print $0}' $gtf > ${gtf}.tmp
+    # see the question
+    # https://www.biostars.org/p/126423/
+    # and solution
+    # https://groups.google.com/forum/#!msg/tuxedo-tools-users/FTKA4qozJIc/p47AwnCXxvwJ
+
     name=${label_fa}_tophat2_cuffcompare
     if [[ -d $name ]]
     then
@@ -465,6 +486,7 @@ cd $name
 for f in *
 do
   [[ \$f =~ ^index\.fa ]] && continue
+  [[ -d \$f ]] && continue
   mv \$f \${f/#index/index.fa}
 done
 echo done
