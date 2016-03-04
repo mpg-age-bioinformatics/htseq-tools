@@ -310,15 +310,16 @@ elif os.path.isfile(python_output+'/KEGG.txt'):
 else:
     print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
     sys.stdout.flush()
-    kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
-    paths = age.pathwaysKEGG(args.KEGGorg)
-    df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')    
-    df=df[['ENSid','KEGGid','pathIDs','pathName']]
-    df.columns=['gene_id','KEGGid','pathIDs','pathName']
+    #kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
+    #paths = age.pathwaysKEGG(args.KEGGorg)
+    df = age.KEGGmatrix(args.KEGGorg, args.dataset, args.mart)] 
+    #df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')    
+    df = df[['ensembl_gene_id','KEGGid','pathsIDs','pathName']]
+    df.columns = ['gene_id','KEGGid','pathIDs','pathName']
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-    df=pd.merge(name_id,df,on=['gene_id'],how='left')
+    df = pd.merge(name_id,df,on=['gene_id'],how='left')
     df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
-    del kegg_ens,paths,df,name_id
+    del df,name_id
 
 
 # create excel report tables
