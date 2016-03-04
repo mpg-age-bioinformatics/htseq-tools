@@ -6,7 +6,7 @@ This repository hosts scripts and tools for analysis of high throughput sequenci
 
 #### ensref
 
-*Made for SLURM*
+*Made for SLURM & Environment Modules Project*
 
 This is the script we use for downloading genome assemblies from ENSEMBL and 
 build the respective indexes and folders structure. 
@@ -171,6 +171,19 @@ SNPsFilter
 A HPC/slurm pipeline to perform RNA methylation analysis.
 Modify the sample sheet and path variables at the beginning of the script.
 Run script on trimmed read data. Submit in slurm environment.
+
+#### GATK_lofreq_slurm.sh
+
+*Made for SLURM & Environment Modules Project*
+
+This is a standard GATK and lofreq variant call pipeline with snpEff annotations.
+
+It is made to make calls on two lines eg. wt and mutant.
+
+It is set for single end sequencing.
+
+Please read the instructions inside the script for usage.
+
 
 ## License
 
