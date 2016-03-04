@@ -177,11 +177,8 @@ Run script on trimmed read data. Submit in slurm environment.
 *Made for SLURM & Environment Modules Project*
 
 This is a standard GATK and lofreq variant call pipeline with snpEff annotations.
-
 It is made to make calls on two lines eg. wt and mutant.
-
 It is set for single end sequencing.
-
 Please read the instructions inside the script for usage.
 
 
