@@ -316,14 +316,16 @@ else:
     except:
         print "\n\n!!! For this organism it was not possible to collect KEGG annotations from biomaRt. Using KEGG. Available KEGG dbs might not be up-to-date.\n\n"
         kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
-        paths = age.pathwaysKEGG(args.KEGGorg)
+        paths, paths_ = age.pathwaysKEGG(args.KEGGorg)
+        kegg_ens['KEGGid']=kegg_ens['KEGGid'].astype(str)
+        paths['KEGGid']=paths['KEGGid'].astype(str)        
         df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')
         df=df[['ENSid','KEGGid','pathIDs','pathName']]
     df.columns = ['gene_id','KEGGid','pathIDs','pathName']
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
     df = pd.merge(name_id,df,on=['gene_id'],how='left')
     df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
-    del df,name_id
+    del df,name_id,paths_
 
 
 # create excel report tables
