@@ -10,9 +10,9 @@ parser = ArgumentParser()
 parser.add_argument('--oGTF', dest = 'oGTF',
                     help = 'Input original GTF file.  ',
                     required=True)
-parser.add_argument('--destGTF', dest = 'destGTF',
-                    help = 'Lifted GTF file (destination).',
-                    required=True)
+#parser.add_argument('--destGTF', dest = 'destGTF',
+#                    help = 'Lifted GTF file (destination).',
+#                    required=True)
 parser.add_argument('--VCF', dest = 'VCF',
                     help = 'VCF file.',
                     required=True)
@@ -169,7 +169,7 @@ with nostderr():
             GTFt['stop']=GTFt['stop'].apply(lambda x: fix(x,VCFt))
             fGTF=pd.concat([fGTF,GTFt])
         
-    fGTF.to_csv(GTF_OUT, sep="\t",header=None,index=None,quoting=csv.QUOTE_NONE)
+    #fGTF.to_csv(GTF_OUT, sep="\t",header=None,index=None,quoting=csv.QUOTE_NONE)
 
     # Fix fasta
 
