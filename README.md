@@ -55,7 +55,7 @@ make.genome -h
 
 #### GATKlift
 
-This scripts lifts GTF and fasta files from GATK reconstructions (ie. FastaAlternateReferenceMaker).
+This scripts lifts fasta files from GATK reconstructions (ie. FastaAlternateReferenceMaker).
 
 Usage:
 ```
