@@ -199,6 +199,30 @@ Usage:
 
 The respective chains file can be found in chains_output/oldFasta_To_newFasta.chain.gz
 
+#### CellPlot
+
+Working Python implementation of CellPlot and SymPlot from the CellPlot package for R.
+
+```
+usage: CellPlot [-h] [-i INPUT] [-n NTERMS] [-o OUTPUT]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i INPUT, --input INPUT
+                        Tab separated tables with the following collumns from
+                        an enrichment analysis: 'Enrichment', 'Significant',
+                        'Annotated', 'Term', and 'log2fc'. For log2fc each
+                        cell must contain a comma separated string with the
+                        log2fc for the genes enriched in the respective term.
+                        eg. '-Inf,-1,2,3.4,3.66,Inf' (default: None)
+  -n NTERMS, --nterms NTERMS
+                        Number of terms to display (default: 10)
+  -o OUTPUT, --output OUTPUT
+                        /path/to/output/prefix This will create the files
+                        prefix.CellPlot.svg, prefix.CellPlot.png,
+                        prefix.SymPlot.svg, prefix.SymPlot.png (default: None)
+``` 
+
 
 ## License
 

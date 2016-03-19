@@ -1,0 +1,20 @@
+#!/usr/bin/env python
+
+import argparse 
+parser = argparse.ArgumentParser(formatter_class = argparse.ArgumentDefaultsHelpFormatter) 
+parser.add_argument("-i", "--input", help="Tab separated tables with the following collumns from an enrichment analysis: 'Enrichment', 'Significant', 'Annotated', 'Term', and 'log2fc'. For log2fc each cell must contain a comma separated string with the log2fc for the genes enriched in the respective term. eg. '-Inf,-1,2,3.4,3.66,Inf'")
+parser.add_argument("-n", "--nterms", help="Number of terms to display", default=10)
+parser.add_argument("-o", "--output", help="/path/to/output/prefix This will create the files prefix.CellPlot.svg, prefix.CellPlot.png,  prefix.SymPlot.svg, prefix.SymPlot.png")
+args = parser.parse_args()  
+
+import pandas as pd
+import AGEpy.AGEpy as age
+#age.matplotlib.use('Agg')
+import os
+import sys
+
+df=pd.read_table(args.input, sep="\t",usecols=['Enrichment', 'Significant', 'Annotated', 'Term','log2fc'], nrows=args.nterms  )
+CP=age.CellPlot(df,os.path.abspath(args.output))
+SP=age.SymPlot(df,os.path.abspath(args.output))
+
+sys.exit()
