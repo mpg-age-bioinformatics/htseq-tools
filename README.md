@@ -194,7 +194,7 @@ More info can be found here: http://hgwdev.cse.ucsc.edu/~kent/src/unzipped/hg/do
 
 Usage:
 ```
-chains_slurm.sh /path/to/old/fasta.fa /path/to/new/fasta.da
+./chains_slurm.sh /path/to/old/fasta.fa /path/to/new/fasta.fa
 ```
 
 The respective chains file can be found in chains_output/oldFasta_To_newFasta.chain.gz
