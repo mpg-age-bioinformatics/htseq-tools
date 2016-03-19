@@ -181,6 +181,24 @@ It is made to make calls on two lines eg. wt and mutant.
 It is set for single end sequencing.
 Please read the instructions inside the script for usage.
 
+#### chains_slurm.sh
+
+*Made for SLURM & Environment Modules Project*
+
+This template lets you create chain files for 2 fasta files of the same species
+after genome reconstruction or de-novo assembly.
+
+This script should be run from project/scripts/chains_slurm.sh
+
+More info can be found here: http://hgwdev.cse.ucsc.edu/~kent/src/unzipped/hg/doc/liftOver.txt and here: http://genomewiki.ucsc.edu/index.php/Minimal_Steps_For_LiftOver
+
+Usage:
+```
+chains_slurm.sh /path/to/old/fasta.fa /path/to/new/fasta.da
+```
+
+The respective chains file can be found in chains_output/oldFasta_To_newFasta.chain.gz
+
 
 ## License
 
