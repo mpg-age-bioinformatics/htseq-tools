@@ -1,7 +1,7 @@
 #!/bin/bash
 
-oldFasta=$0
-newFasta=$1
+oldFasta=$1
+newFasta=$2
 
 module load BLAT
 module load kentutils
