@@ -96,6 +96,10 @@ echo "Blat jobs running: ${IDS}"
 echo "#!/bin/bash
 cd ${new}
 
+module load BLAT
+module load kentutils
+module load kentTools
+
 DIR=chains
 BATCH_SIZE=1000
 SUBFOLDER_NAME=chains.part
@@ -105,20 +109,20 @@ mkdir ${new}/chains_parts
 mkdir ${new}/first_chain_merge
 
 # Merge chain files
-while [ `\find \$DIR -maxdepth 1 -type f| wc -l` -gt \$BATCH_SIZE ] ; do
+while [ \`find \$DIR -maxdepth 1 -type f| wc -l\` -gt \$BATCH_SIZE ] ; do
     NEW_DIR=${new}/chains_parts/\${SUBFOLDER_NAME}\${COUNTER}
     mkdir \${NEW_DIR}
     find \$DIR -maxdepth 1 -type f | head -n \$BATCH_SIZE | xargs -I {} mv {} \$NEW_DIR
     cd \${NEW_DIR}
     chainMergeSort *.chain > ${new}/first_chain_merge/\${SUBFOLDER_NAME}\${COUNTER}.chain
-    cd \${new}
+    cd ${new}
     let COUNTER++
 done
 
 NEW_DIR=${new}/chains_parts/\${SUBFOLDER_NAME}\${COUNTER}
 mkdir \${NEW_DIR}
 mv chains/*.chain \${NEW_DIR}
-cd \${NEW_DIR}
+cd ${NEW_DIR}
 chainMergeSort *.chain > ${new}/first_chain_merge/\${SUBFOLDER_NAME}\${COUNTER}.chain
 
 cd ${new}
