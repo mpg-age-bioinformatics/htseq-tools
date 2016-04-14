@@ -34,6 +34,7 @@ parser.add_argument("--KEGGdb", help="KEGG database linked to your ensembl organ
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list", default='WORMBASE_GENE_ID')
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list.", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,BIOCARTA,PFAM,PROSITE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
+parser.add_argument("--host", help="Ensembl host. Check http://www.ensembl.org/info/website/archives/index.html for older releases.", default='ensembl.org') 
 parser.add_argument("--AGEpy", help="Install AGEpy package with pip") 
 args = parser.parse_args()
 
@@ -74,19 +75,19 @@ import shutil
 ############### FUNCTIONS ############
 
 if args.listMarts:
-    print(age.RdatabasesBM())
+    print(age.RdatabasesBM(host=args.host))
     sys.exit(0)
 
 if args.listDatasets:
-    print(age.RdatasetsBM(args.mart))
+    print(age.RdatasetsBM(args.mart,host=args.host))
     sys.exit(0)
 
 if args.listFilters:
-    print(age.RfiltersBM(args.dataset,args.mart))
+    print(age.RfiltersBM(args.dataset,args.mart,host=args.host ))
     sys.exit(0)
 
 if args.listAttributes:
-    print(age.RattributesBM(args.dataset,args.mart))
+    print(age.RattributesBM(args.dataset,args.mart,host=args.host))
     sys.exit(0)
 
 if args.listKEGGorganisms:
@@ -161,17 +162,13 @@ else:
 
 sys.stdout.flush()
 
-in_files=args.inputFiles
-in_files=in_files.split()
+in_files=args.inputFiles.split()
 
-out_labels=args.shortOutputName
-out_labels=out_labels.split()
+out_labels=args.shortOutputName.split()
 
-data_output_biotypes=args.outputBiotypes
-data_output_biotypes=data_output_biotypes.split()
+data_output_biotypes=args.outputBiotypes.split()
 
-data_output_goterms=args.outputGoterms
-data_output_goterms=data_output_goterms.split()
+data_output_goterms=args.outputGoterms.split()
 
 ###################### START #####################
 
@@ -183,7 +180,7 @@ if os.path.isfile(python_output+'/genes_table.txt'):
     print "\nUsing already existing list of gene names and ids"
     sys.stdout.flush()
     genes=pd.read_table(python_output+'/genes_table.txt')
-    genes = genes['gene_id'].tolist()
+    genes = genes['ensembl_gene_id'].tolist()
 
 else:
     print "\nGetting list of gene names and respective ids present in the data set"
@@ -201,28 +198,29 @@ else:
     sys.stdout.flush()
 
     gtf=age.readGTF(original_gtf)
-    print "GTF imported"
-    sys.stdout.flush()
-
-    gene_name = age.retrieve_GTF_field('gene_name',gtf)
-    print "Read gene names from GTF"
-    sys.stdout.flush()
-
     gene_id = age.retrieve_GTF_field('gene_id',gtf)
-    print "Read gene ids from GTF"
-    sys.stdout.flush()
+    transcript_id=age.retrieve_GTF_field('transcript_id',gtf) 
+    transcript_gene=pd.concat([transcript_id,gene_id],axis=1)
+    transcript_gene.columns=["transcript_id","ensembl_gene_id"]
+    transcript_gene=transcript_gene.drop_duplicates()
 
-    name_id = pd.concat([gene_name, gene_id], axis=1).drop_duplicates()
-    name_id = name_id[name_id['gene_name'].isin(genes)]
-    print "Generated Names/IDs table"
-    sys.stdout.flush()
+    mergeGTF=age.readGTF(merged_fixed_gtf)
+    gene_xloc=age.retrieve_GTF_field("gene_id", mergeGTF)
+    gene_id=age.retrieve_GTF_field("oId", mergeGTF)
+    gene_id.columns=["transcript_id"]
 
-    genes = name_id['gene_id'].tolist()
-
+    name_id=pd.concat([gene_xloc,gene_id],axis=1) #gene_name
+    name_id=name_id.drop_duplicates()
+    name_id.reset_index(inplace=True,drop=True)
+    
+    name_id=pd.merge(name_id,transcript_gene,on="transcript_id",how="left") 
+    name_id=name_id[['gene_id','ensembl_gene_id']]    
+    genes = name_id[['ensembl_gene_id']].drop_duplicates()['ensembl_gene_id'].tolist()
+    
     name_id.to_csv(python_output+'/genes_table.txt', sep="\t",index=False)
 
-    del gtf, gene_name, gene_id, name_id
-
+    del gtf, transcript_id, transcript_gene, mergeGTF, gene_xloc, gene_id, name_id
+    
 
 # Use BioMart to retrieve biotypes and gene ontoloty information
 
@@ -238,11 +236,15 @@ elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
 else:
     print "\nRetrieving biotypes and gene ontology information"
     sys.stdout.flush()
-    biotypes=age.RqueryBM(args.filter,genes,data_output_biotypes,args.dataset,args.mart)
-    biotypes.columns=[args.filter ,data_output_biotypes[1]]
-    goterms=age.RqueryBM(args.filter,genes,data_output_goterms,args.dataset,args.mart)
-    goterms.columns=[args.filter,data_output_goterms[1],data_output_goterms[2]]
-    bio_go=pd.merge(biotypes,goterms,on=args.filter ,how="outer")
+    biotypes=age.RqueryBM("with_embl",True,data_output_biotypes,args.dataset,args.mart,host=args.host)    
+    biotypes.columns=['ensembl_gene_id',data_output_biotypes[1]]
+    biotypes=biotypes[biotypes["ensembl_gene_id"].isin(genes)]    
+ 
+    goterms=age.RqueryBM("with_embl",True,data_output_goterms,args.dataset,args.mart,host=args.host)   
+    goterms.columns=['ensembl_gene_id',data_output_goterms[1],data_output_goterms[2]]
+    goterms=goterms[goterms['ensembl_gene_id'].isin(genes)]    
+
+    bio_go=pd.merge(biotypes,goterms,on='ensembl_gene_id',how="outer")
     bio_go.to_csv(python_output+'/biotypes_go_raw.txt', quote=False, index=False, sep='\t', row_names=False)
 
 
@@ -261,40 +263,29 @@ else:
     sys.stdout.flush()
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
     ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
-    ontology.columns = ['gene_id','gene_biotype','GO_id','GO_term']
-    ontology = pd.merge(name_id, ontology, how='outer', on='gene_id')
-    ontology = ontology[['gene_name','gene_biotype','GO_id','GO_term']]
-    ontology.columns = ['gene_name','gene_biotype','GO_id','GO_term']
+    ontology.columns = ['ensembl_gene_id','gene_biotype','GO_id','GO_term']
 
-    final = pd.DataFrame(columns = ['gene_name','gene_biotype','GO_id','GO_term'])
+    final = pd.DataFrame(columns = ['ensembl_gene_id','gene_biotype','GO_id','GO_term'])
 
-    genes = ontology[['gene_name']]
-    genes = genes.drop_duplicates()
-    for gene in list(genes.gene_name):
-        ontology_gene = ontology[ontology['gene_name'] == gene]
-        ontology_gene_go = ontology_gene[['GO_id','GO_term']]
-        if len(ontology_gene_go.index) >= 1:
-            ontology_gene_go = ontology_gene_go.transpose()
-            ontology_gene_go.to_csv("tmp.txt", sep=";", header=False, index=False)
-            ontology_gene_go_number = pd.read_table("tmp.txt", sep ="\t", header=None, nrows = 1)
-            ontology_gene_go_name = pd.read_table("tmp.txt", sep ="\t", header=None, skiprows=1, nrows = 1)
-            ontology_gene_go = pd.concat([ontology_gene_go_number, ontology_gene_go_name], axis=1)
-            ontology_gene_go.columns = ['GO_id','GO_term']
-        else:
-            ontology_gene_go = pd.DataFrame(columns = ['GO_id','GO_term'])
-
-        ontology_gene = ontology_gene[['gene_name','gene_biotype']].drop_duplicates()
-        ontology_gene_go = ontology_gene_go.reset_index()
-        ontology_gene = ontology_gene.reset_index()
-        ontology_gene = pd.concat([ontology_gene, ontology_gene_go], axis = 1)
-        ontology_gene = ontology_gene[['gene_name','gene_biotype','GO_id','GO_term']]
-        final = pd.concat([final, ontology_gene])
-    os.remove("tmp.txt")
+    for gene in list(set(ontology.ensembl_gene_id.tolist())):
+        ontology_gene = ontology[ontology['ensembl_gene_id'] == gene]
+        if len(ontology_gene) > 1:
+            GO_ids=ontology_gene['GO_id'].tolist()
+            GO_ids=[ str(s) for s in GO_ids ]
+            GO_ids="; ".join(GO_ids)
+            GO_term=ontology_gene['GO_term'].tolist()
+            GO_term=[ str(s) for s in GO_term ] 
+            GO_term="; ".join(GO_term)
+            biotype=ontology_gene['gene_biotype'].tolist()[0]
+            ontology_gene={"ensembl_gene_id":gene , 'gene_biotype':biotype , 'GO_id':GO_ids , 'GO_term':GO_term} 
+            ontology_gene=pd.DataFrame(ontology_gene,index=[0])
+        
+        final=pd.concat([final,ontology_gene])
+            
     final.reset_index()
-    final=final[['gene_name','gene_biotype','GO_id','GO_term']]
     final.to_csv(python_output+"/biotypes_go.txt", sep= "\t")
 
-    del name_id, ontology, genes, ontology_gene, ontology_gene_go, ontology_gene_go_number, ontology_gene_go_name, final
+    del name_id, ontology, genes, ontology_gene, final
 
 # generate KEGG table
 
@@ -321,11 +312,9 @@ else:
         paths['KEGGid']=paths['KEGGid'].astype(str)        
         df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')
         df=df[['ENSid','KEGGid','pathIDs','pathName']]
-    df.columns = ['gene_id','KEGGid','pathIDs','pathName']
-    name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-    df = pd.merge(name_id,df,on=['gene_id'],how='left')
+    df.columns = ['ensembl_gene_id','KEGGids','pathIDs','pathName']
     df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
-    del df,name_id,paths_
+    del df,paths_
 
 
 # create excel report tables
@@ -335,8 +324,10 @@ if args.TSV:
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t", usecols=['gene_name','KEGGid','pathIDs','pathName'])
-KEGG.columns=['identifier','KEGG_ids','KEGG_pathIDS','KEGG_pathNames' ]
+KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t")
+
+final_labels=pd.DataFrame()
+
 
 for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
@@ -379,17 +370,12 @@ for sig, label in zip(sig_choice,label_choice):
             else:
                 df = df[df['p_value'] < sig]
             df = df.reset_index()
-            df['gene'] = df['gene'].astype(str)
-            tmp = pd.DataFrame(df.gene.str.split(',',1).tolist())
-            if len(tmp) < 1:
-                print "skipping empty file"
-                continue
-            tmp = pd.DataFrame(tmp.ix[:,0])
-            tmp.columns = ['identifier']
-            df = pd.concat([df,tmp], axis=1)
-            df = pd.merge(df, bio_go, how='left', left_on='identifier', right_on='gene_name')
-            df = pd.merge(df,KEGG, how='left', on='identifier') 
-
+            df = pd.merge(name_id, df, on='gene_id',how="right" ) 
+            df = pd.merge(df, bio_go, how='left', on='ensembl_gene_id')
+            df = pd.merge(df,KEGG, how='left', on='ensembl_gene_id') ### keep on from here
+            fl = df[['gene_id','gene','ensembl_gene_id']]
+            final_labels = pd.concat([final_labels,fl])
+            final_labels = final_labels.drop_duplicates()
             if imp == 'isoform_exp.diff': # for isoform_exp.diff we want to have the transcript references
                 gtf=age.readGTF(merged_fixed_gtf)
                 t_id = age.retrieve_GTF_field('transcript_id',gtf)    
@@ -402,57 +388,39 @@ for sig, label in zip(sig_choice,label_choice):
             """for significant changes also report overlaps between the days, pair-wise, as well as go ontology enrichemnt for each table from DAVID"""
             if sig == 'yes':
 
-                sample1 = df[['sample_1']]
-                sample1.columns=['samples']
-                sample2 = df[['sample_2']]
-                sample2.columns=['samples']
-                samples=pd.concat([sample1,sample2])
-                samples=samples.drop_duplicates()
-                samples=samples['samples'].tolist()
-
                 if args.DAVID:
                     DAVIDall=pd.DataFrame()
 
-                readyList=[]
+                samples=df[['sample_1','sample_2']].drop_duplicates().as_matrix()
+                for s in samples:
+                    sample1=s[0]
+                    sample2=s[1]
 
-                for sample1 in samples:
-                    for sample2 in samples:
-                        if sample1 != sample2:
-                            if sample1+sample2 not in readyList :
-                                if sample2+sample1 not in readyList :
-
-                                    readyList.append(sample1+sample2)
-                                    df_pair = df[df['sample_1'].isin([sample1,sample2])][df['sample_2'].isin([sample1,sample2])]
-                                    if args.DAVID:
-                                        print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
-                                        sys.stdout.flush()
+                    df_pair = df[df['sample_1']==sample1][df['sample_2']==sample2]
+                    if args.DAVID:
+                        print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
+                        sys.stdout.flush()
                                         
-                                        targets=name_id.copy()
-                                        targets.columns=['gene_name','targets']
-                                        
-                                        background=targets['targets'].tolist()
- 
-                                        targets = pd.merge(df_pair, targets, how='left', left_on='identifier', right_on='gene_name')
-                                        targets = targets[['targets']].dropna()
-                                        targets = targets['targets'].tolist()                                       
-                                        if len(targets) > 0: 
-                                            dfDAVID=age.DAVIDenrich(args.DAVIDid, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
-                                            if dfDAVID is not None:
-                                                dfDAVID['sheet_name'] = sample1+'|'+sample2
-                                                dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
-                                                DAVIDall=pd.concat([DAVIDall,dfDAVID])
+                        background=list(set(name_id['ensembl_gene_id'].tolist()))
+                        targets = list(set(df_pair['ensembl_gene_id'].tolist()))                    
+    
+                        if len(targets) > 0: 
+                            dfDAVID=age.DAVIDenrich(args.DAVIDid, args.DAVIDcat, user=args.DAVIDuser, ids=targets, ids_bg=background, name_bg = 'all_RNAseq_genes', name = 'changed_genes', verbose=True)
+                            if dfDAVID is not None:
+                                dfDAVID['sheet_name'] = sample1+'|'+sample2
+                                dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
+                                DAVIDall=pd.concat([DAVIDall,dfDAVID])
 
-                                    df_pair.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
+                                df_pair.drop(['test_id','index','gene_id','Unnamed: 0'], axis=1, inplace=True)                                
+                                if imp not in ['gene_exp.diff','isoform_exp.diff']:
+                                   df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
 
-                                    if imp not in ['gene_exp.diff','isoform_exp.diff']:
-                                        df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
+                                if not args.TSVall:
+                                    df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
+                                else:                                
+                                    df_pair.to_csv(TSVout+label+'_'+outshort+'_'+sample1+'_vs_'+sample2+'.tsv',sep="\t", index=False)                                    
 
-                                    if not args.TSVall:
-                                        df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
-                                    else:                                
-                                        df_pair.to_csv(TSVout+label+'_'+outshort+'_'+sample1+'_vs_'+sample2+'.tsv',sep="\t", index=False)                                    
-
-            df.drop(['test_id','index','gene_id','Unnamed: 0','identifier','gene_name'], axis=1, inplace=True)
+            df.drop(['test_id','index','gene_id','Unnamed: 0'], axis=1, inplace=True)
 
             if imp not in ['gene_exp.diff','isoform_exp.diff']:
                 df.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
@@ -465,6 +433,8 @@ for sig, label in zip(sig_choice,label_choice):
                     df.to_csv(TSVout+label+'_'+outshort+'_ALL.tsv',sep="\t", index=False)
                 
                 if args.DAVID:
+                    fila=final_labels[[ 'ensembl_gene_id', 'gene' ]]
+                    fila.columns=['gene_id','gene_name']
                     if len(DAVIDall) > 0:
                         print "Writing DAVID output tables"
                         sys.stdout.flush()
@@ -481,7 +451,7 @@ for sig, label in zip(sig_choice,label_choice):
                                     print sheet
                                     sys.stdout.flush()
                                     dfSHEET=dfCAT[dfCAT['sheet_name']==sheet]
-                                    dfSHEET=age.id_nameDAVID(dfSHEET,name_id=name_id)
+                                    dfSHEET=age.id_nameDAVID(dfSHEET,name_id=fila)
                                     dfSHEET=dfSHEET.drop(['sheet_name','file_name'],axis=1)
                                     dfSHEET.to_excel(writerD, sheet, index=False)                                        
                                 writerD.save()
