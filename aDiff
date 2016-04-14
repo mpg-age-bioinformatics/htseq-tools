@@ -214,7 +214,7 @@ else:
     name_id.reset_index(inplace=True,drop=True)
     
     name_id=pd.merge(name_id,transcript_gene,on="transcript_id",how="left") 
-    name_id=name_id[['gene_id','ensembl_gene_id']]    
+    name_id=name_id[['gene_id','ensembl_gene_id']].drop_duplicates() 
     genes = name_id[['ensembl_gene_id']].drop_duplicates()['ensembl_gene_id'].tolist()
     
     name_id.to_csv(python_output+'/genes_table.txt', sep="\t",index=False)
