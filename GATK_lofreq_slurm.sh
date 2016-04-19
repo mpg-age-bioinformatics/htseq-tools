@@ -245,7 +245,7 @@ sbatch -d afterok${IDS} -o ${logs}${LabelA}.%j.out ${tmp}${LabelA}.joint.sh
 # Line 2
 echo "#!/bin/bash
 cd ${others}
-java -jar ${GA} -T GenotypeGVCFs -R ${faref} ${GVCFs1::(-1)} -o ${var}${LabelB}.vcf
+java -jar ${GA} -T GenotypeGVCFs -R ${faref} ${GVCFs2::(-1)} -o ${var}${LabelB}.vcf
 java -jar ${GA} -T SelectVariants -R ${faref} -V ${var}${LabelB}.vcf -selectType SNP -o ${var}${LabelB}_raw_snps.vcf
 java -jar ${GA} -T SelectVariants -R ${faref} -V ${var}${LabelB}.vcf -selectType INDEL -o ${var}${LabelB}_raw_INDELS.vcf
 #java -jar ${GA} -T VariantFiltration -R ${faref} -V ${var}${LabelB}_raw_snps.vcf --filterExpression 'QD < 2.0 || FS > 60.0 || MQ < 40.0 || MQRankSum < -12.5' --filterName '${LabelB}_snps_a' --filterExpression 'ReadPosRankSum < -8.0' --filterName '${LabelB}_snps_b'  -o ${var}${LabelB}_filt_snps.vcf
