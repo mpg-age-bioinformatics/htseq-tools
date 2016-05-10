@@ -337,7 +337,7 @@ for sig, label in zip(sig_choice,label_choice):
                 sys.stdout.flush()
             else:
                 writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
-                print "\nWritting table "+label+".xlsx"
+                print "\nWriting table "+label+".xlsx"
                 sys.stdout.flush()
     
         else:
@@ -346,7 +346,7 @@ for sig, label in zip(sig_choice,label_choice):
                 sys.stdout.flush()
             else:
                 writer = pd.ExcelWriter(python_output+'/'+label+'.xlsx')
-                print "\nWritting table "+label+".xlsx"
+                print "\nWriting table "+label+".xlsx"
                 sys.stdout.flush()
 
     for imp, outshort in zip(in_files, out_labels):
@@ -360,7 +360,7 @@ for sig, label in zip(sig_choice,label_choice):
             if sig == 'yes':
                 if not args.TSVall:
                     writer = pd.ExcelWriter(python_output+'/'+label+'_'+outshort+'.xlsx')
-                    print "Writting table "+label+"_"+outshort+".xlsx"
+                    print "Writing table "+label+"_"+outshort+".xlsx"
                     sys.stdout.flush()
 
             df = df.sort('p_value')
