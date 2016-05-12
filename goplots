@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+
+# goplots - generate CellPlots and SymPlots from gene ontology enrichment analysis
+#
+# Author: Sven E. Templer
+#
+# Copyright (c) 2016 - Bioinformatics Core Facility of the
+# Max Planck Institute for Biology of Ageing, Cologne, Germany
+
+import argparse 
+parser = argparse.ArgumentParser(formatter_class = argparse.ArgumentDefaultsHelpFormatter) 
+parser.add_argument("table", help = "Input table", nargs = "+")
+parser.add_argument("-s", "--sheets", help = "Sheet for xl input", default = None)
+parser.add_argument("-d", "--delimiter", help = "For text input files, the column separator", default = '\t')
+parser.add_argument("--col-term", help = "Column name for term names/ids", default = "termName")
+parser.add_argument("--col-enrich", help = "Column name for (log) fold enrichment values", default = "foldEnrichment")
+parser.add_argument("--col-nsign", help = "Column name for number of significant genes", default = "listHits")
+parser.add_argument("--col-deg", help = "Column name for differential gene expression (e.g. logFC-) values", default = "geneExpression")
+parser.add_argument("-n", "--nterms", help = "Number of terms to plot", default = 20)
+parser.add_argument("-o", "--output-folder", help = "Output directory", default = "cellplot_output")
+
+#parser.add_argument("-i", "--input", help="Tab separated tables with the following collumns from an enrichment analysis: 'Enrichment', 'Significant', 'Annotated', 'Term', and 'log2fc'. For log2fc each cell must contain a comma separated string with the log2fc for the genes enriched in the respective term. eg. '-Inf,-1,2,3.4,3.66,Inf'")
+#parser.add_argument("-n", "--nterms", help="Number of terms to display", default=20)
+#parser.add_argument("-o", "--output", help="/path/to/output/prefix This will create the files prefix.CellPlot.svg, prefix.CellPlot.png,  prefix.SymPlot.svg, prefix.SymPlot.png")
+args = parser.parse_args()  
+
+import os
+import sys
+import pandas as pandas
+import AGEpy.AGEpy as AGEpy
+
+from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
+
+
+sheets = args.sheets
+if sheets is None:
+  sheets = [""]
+if not os.path.exists(args.output_folder):
+  os.makedirs(args.output_folder)
+
+
+for f in args.table:
+  f_name, f_suffix = os.path.splitext(os.path.basename(f))
+  f_fmt = AGEpy.getFileFormat(f)
+  print '* file (format=' + f_fmt + '): ' + f 
+  sys.stdout.flush()
+  if f_fmt in ["xls", "xlsx"] and args.sheets is None:
+    sheets = pandas.ExcelFile(f).sheet_names
+  for s in sheets:
+    s_name = s
+    if s is "":
+      s = None
+    else:
+      print '  - sheet: ' + s_name
+      sys.stdout.flush()
+    d = AGEpy.readDataFrame(f, sheet = s, sep = args.delimiter)
+    #d = d.sort_values(by = args.col_enrich, ascending = False)
+    d = d.head(n = args.nterms)
+    d = d.loc[:,[args.col_term, args.col_enrich, args.col_nsign, args.col_deg]]
+    d.rename(columns = { args.col_term : 'Term', args.col_enrich : 'Enrichment', args.col_deg : 'log2fc', args.col_nsign : 'Significant' }, inplace = True)
+    out_prefix = args.output_folder + '/' + f_name + '_' + s_name
+    out_pdf = out_prefix + '.CellPlot.pdf'
+    out_title = f_name + '\n' + s_name
+    pp = PdfPages(out_pdf)
+    AGEpy.CellPlot(d, output_file = out_prefix, figure_title = out_title, pvalCol = None, colorBarType = 'seismic')
+    plt.savefig(pp, format = 'pdf', dpi = 300, bbox_inches = 'tight', pad_inches = 0.1)
+    pp.close()
+
+print '* done'
+sys.stdout.flush()
+
+#df=pd.read_table(args.input, sep="\t",usecols=['foldEnrichment', 'Significant', 'Annotated', 'Term','log2fc'], nrows=args.nterms  )
+#CP=age.CellPlot(df,os.path.abspath(args.output))
+#SP=age.SymPlot(df,os.path.abspath(args.output))
+
+sys.exit()
