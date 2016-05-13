@@ -15,9 +15,11 @@ parser.add_argument("-d", "--delimiter", help = "For text input files, the colum
 parser.add_argument("--col-term", help = "Column name for term names/ids", default = "termName")
 parser.add_argument("--col-enrich", help = "Column name for (log) fold enrichment values", default = "foldEnrichment")
 parser.add_argument("--col-nsign", help = "Column name for number of significant genes", default = "listHits")
+parser.add_argument("--col-nannotated", help = "Column name for number of annotated genes", default = 'Annotated')
 parser.add_argument("--col-deg", help = "Column name for differential gene expression (e.g. logFC-) values", default = "geneExpression")
+parser.add_argument("-f", "--format-deg", help = "Replace missing gene expression values by mean of values per term", action = "store_true")
 parser.add_argument("-n", "--nterms", help = "Number of terms to plot", default = 20)
-parser.add_argument("-o", "--output-folder", help = "Output directory", default = "cellplot_output")
+parser.add_argument("-o", "--output-folder", help = "Output directory", default = "goplots_output")
 
 #parser.add_argument("-i", "--input", help="Tab separated tables with the following collumns from an enrichment analysis: 'Enrichment', 'Significant', 'Annotated', 'Term', and 'log2fc'. For log2fc each cell must contain a comma separated string with the log2fc for the genes enriched in the respective term. eg. '-Inf,-1,2,3.4,3.66,Inf'")
 #parser.add_argument("-n", "--nterms", help="Number of terms to display", default=20)
@@ -40,6 +42,27 @@ if not os.path.exists(args.output_folder):
   os.makedirs(args.output_folder)
 
 
+def isnum(x):
+    try:
+        float(x)
+        return True
+    except:
+        return False
+    
+def NAasmean(x):
+    if isinstance(x, float):
+        return x
+    xl = x.split(', ')
+    s = 0.0
+    for v in xl:
+        if isnum(v):
+            s += float(v)
+    m = s / len(xl)
+    for i, v in enumerate(xl):
+        if not isnum(v):
+            xl[i] = str(m)
+    return ', '.join(xl)
+
 for f in args.table:
   f_name, f_suffix = os.path.splitext(os.path.basename(f))
   f_fmt = AGEpy.getFileFormat(f)
@@ -57,15 +80,23 @@ for f in args.table:
     d = AGEpy.readDataFrame(f, sheet = s, sep = args.delimiter)
     #d = d.sort_values(by = args.col_enrich, ascending = False)
     d = d.head(n = args.nterms)
-    d = d.loc[:,[args.col_term, args.col_enrich, args.col_nsign, args.col_deg]]
-    d.rename(columns = { args.col_term : 'Term', args.col_enrich : 'Enrichment', args.col_deg : 'log2fc', args.col_nsign : 'Significant' }, inplace = True)
+    d = d.loc[:,[args.col_term, args.col_enrich, args.col_nsign, args.col_nannotated, args.col_deg]]
+    d.rename(columns = { args.col_term : 'Term', args.col_enrich : 'Enrichment', args.col_deg : 'log2fc', args.col_nsign : 'Significant', args.col_nannotated : 'Annotated' }, inplace = True)
+    if args.format_deg:
+      d['log2fc'] = d['log2fc'].apply(NAasmean)
     out_prefix = args.output_folder + '/' + f_name + '_' + s_name
-    out_pdf = out_prefix + '.CellPlot.pdf'
+    out_pdf_cp = out_prefix + '.CellPlot.pdf'
+    out_pdf_sp = out_prefix + '.SymPlot.pdf'
     out_title = f_name + '\n' + s_name
-    pp = PdfPages(out_pdf)
+    pp = PdfPages(out_pdf_cp)
     AGEpy.CellPlot(d, output_file = out_prefix, figure_title = out_title, pvalCol = None, colorBarType = 'seismic')
     plt.savefig(pp, format = 'pdf', dpi = 300, bbox_inches = 'tight', pad_inches = 0.1)
     pp.close()
+    pp = PdfPages(out_pdf_sp)
+    AGEpy.SymPlot(d, output_file = out_prefix, figure_title = out_title, pvalCol = None)
+    plt.savefig(pp, format = 'pdf', dpi = 300, bbox_inches = 'tight', pad_inches = 0.1)
+    pp.close()
+
 
 print '* done'
 sys.stdout.flush()
