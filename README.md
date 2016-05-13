@@ -223,6 +223,97 @@ optional arguments:
                         prefix.SymPlot.svg, prefix.SymPlot.png (default: None)
 ``` 
 
+#### topgo
+
+Run gene ontology enrichment analysis using R/Bioconductor's topGO package.
+
+Usage:
+
+```
+usage: topgo [-h] [-i NAME] [-e NAME] [-n NAME [NAME ...]] [-f FORMAT]
+             [-o OUTPUT_PREFIX] [-x] [-v] [-w]
+             organism table [table ...]
+
+topgo - perform gene ontology enrichment analysis using Bioconductor/topGO
+
+positional arguments:
+  organism              Select organism [second field as identifier from
+                        Bioconductor AnnotationDbi 'org' databases]. E.g. 'Dm'
+                        for 'org.Dm.eg.db'. Supported are Ag = Anopheles, Bt =
+                        Bovine, Ce = Worm, Cf = Canine, Dm = Fly, Dr =
+                        Zebrafish, Gg = Chicken, Hs = Human, Mm = Mouse, Mmu =
+                        Rhesus, Pt = Chimp, Rn = Rat. See also: http://biocond
+                        uctor.org/packages/release/BiocViews.html#___OrgDb
+                        Currently unsupported are At, EcK12, EcSakai, Pf, Ss,
+                        Xl.
+  table                 Path to tabular input file(s).
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i NAME, --id-column NAME
+                        Column name of gene identifiers (Ensembl gene ids) to
+                        query. (default: gene)
+  -e NAME, --expression-column NAME
+                        Column name of gene expression values. Merged into
+                        output column 'GenesSignificantExpression'. (default:
+                        None)
+  -n NAME [NAME ...], --name-columns NAME [NAME ...]
+                        Column name(s) for other values to be coerced as
+                        lists. Merged into output column
+                        'GenesSignificantNAME'. (default: None)
+  -f FORMAT, --input-format FORMAT
+                        Select the input file format. (default: tsv)
+  -o OUTPUT_PREFIX, --output-prefix OUTPUT_PREFIX
+                        Output file prefix. Can contain slashes for (sub)
+                        folders. Prepended to input file base names without
+                        suffix and sheet names. (default: topgo.)
+  -x                    Also output a .xlsx version. (default: False)
+  -v, --verbose         Be more verbose on what is done. (default: False)
+  -w, --show-warnings   Show 'warnings()' after reading tables. (default:
+                        False)
+```
+
+#### goplots
+
+Create plots from gene ontology or other enrichment analysis.
+
+Usage:
+
+```
+usage: goplots [-h] [-s SHEETS] [-d DELIMITER] [--col-term COL_TERM]
+               [--col-enrich COL_ENRICH] [--col-nsign COL_NSIGN]
+               [--col-nannotated COL_NANNOTATED] [--col-deg COL_DEG] [-f]
+               [-n NTERMS] [-o OUTPUT_FOLDER]
+               table [table ...]
+
+positional arguments:
+  table                 Input table
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -s SHEETS, --sheets SHEETS
+                        Sheet for xl input (default: None)
+  -d DELIMITER, --delimiter DELIMITER
+                        For text input files, the column separator (default: )
+  --col-term COL_TERM   Column name for term names/ids (default: termName)
+  --col-enrich COL_ENRICH
+                        Column name for (log) fold enrichment values (default:
+                        foldEnrichment)
+  --col-nsign COL_NSIGN
+                        Column name for number of significant genes (default:
+                        listHits)
+  --col-nannotated COL_NANNOTATED
+                        Column name for number of annotated genes (default:
+                        Annotated)
+  --col-deg COL_DEG     Column name for differential gene expression (e.g.
+                        logFC-) values (default: geneExpression)
+  -f, --format-deg      Replace missing gene expression values by mean of
+                        values per term (default: False)
+  -n NTERMS, --nterms NTERMS
+                        Number of terms to plot (default: 20)
+  -o OUTPUT_FOLDER, --output-folder OUTPUT_FOLDER
+                        Output directory (default: goplots_output)
+```
 
 ## License
 
