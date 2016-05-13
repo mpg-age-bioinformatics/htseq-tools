@@ -1,0 +1,330 @@
+#!/usr/bin/env Rscript
+
+### about
+
+# topgo - perform gene ontology enrichment analysis
+#
+# Author: Sven E. Templer
+#
+# Copyright (c) 2016 - Bioinformatics Core Facility of the
+# Max Planck Institute for Biology of Ageing, Cologne, Germany
+#
+# dependencies:
+# python >= 2.7
+# python/argparse
+# R/argparse
+# R/readxl
+# R/openxlsx
+# R-Bioconductor/topGO
+# R-Bioconductor/AnnotationDbi
+# R-Bioconductor/org.*.*.db packages
+
+
+### functions
+
+is.significant <- function (x, alpha = 0.05) {
+  i <- x <= alpha
+  i[is.na(x)] <- FALSE
+  return(i)
+}
+
+
+### get options
+
+
+iprog <- "topgo"
+idescription <- paste(iprog,
+  "- perform gene ontology enrichment analysis using Bioconductor/topGO")
+iepilog <- "Copyright (c) 2016 - Sven E. Templer <sven.templer at gmail.com>"
+if (!require("argparse", quietly = TRUE)) stop("Missing CRAN package 'argparse'")
+p <- ArgumentParser(prog = iprog, description = idescription,
+  epilog = iepilog, formatter_class = "argparse.ArgumentDefaultsHelpFormatter")
+
+# query options
+p$add_argument("organism",
+  help = paste("Select organism [second field as identifier from Bioconductor",
+    "AnnotationDbi 'org' databases]. E.g. 'Dm' for 'org.Dm.eg.db'.",
+    "Supported are Ag = Anopheles, Bt = Bovine, Ce = Worm, Cf = Canine, Dm = Fly,",
+    "Dr = Zebrafish, Gg = Chicken, Hs = Human, Mm = Mouse, Mmu = Rhesus, Pt = Chimp, Rn = Rat.",
+    "See also: http://bioconductor.org/packages/release/BiocViews.html#___OrgDb", 
+    "Currently unsupported are At, EcK12, EcSakai, Pf, Ss, Xl."))
+
+# input file options
+p$add_argument("table", nargs = "+",
+  help = "Path to tabular input file(s).")
+p$add_argument("-i", "--id-column", metavar = "NAME", default = "gene", nargs = 1,
+  help = "Column name of gene identifiers (Ensembl gene ids) to query.")
+p$add_argument("-e", "--expression-column", metavar = "NAME", nargs = 1,
+  help = "Column name of gene expression values. Merged into output column 'GenesSignificantExpression'.")
+p$add_argument("-n", "--name-columns", metavar = "NAME", nargs = "+",
+  help = "Column name(s) for other values to be coerced as lists. Merged into output column 'GenesSignificantNAME'.")
+p$add_argument("-f", "--input-format", metavar = "FORMAT", default = "tsv",
+  nargs = 1, choices = c("tsv", "csv", "xlsx"),
+  help = "Select the input file format.")
+
+# output file options
+p$add_argument("-o", "--output-prefix", default = "topgo.",
+  help = "Output file prefix. Can contain slashes for (sub) folders. Prepended to input file base names without suffix and sheet names.")
+p$add_argument("-x", dest = "output_xlsx", action = "store_true",
+  help = "Also output a .xlsx version.")
+#p$add_argument("-m", dest = "maximum-memory", metavar = "MB", default = 1024, type = "integer",
+#  help = "Maximum memory in megabytes for Java to use when exporting to xlsx.") # needed for XLConnect
+
+# others
+p$add_argument("-v", "--verbose", action = "store_true",
+  help = "Be more verbose on what is done.")
+p$add_argument("-w", "--show-warnings", action = "store_true",
+  help = "Show 'warnings()' after reading tables.")
+
+args <- p$parse_args()
+if (args$verbose) {
+  cat("* arguments:\n")
+  null <- Map(function (a, n) { cat("  ", n, ":", a, "\n") }, args, names(args))
+}
+
+
+### load R packages
+
+
+if (args$verbose) cat("* loading R packages\n")
+db <- switch(args$organism,
+  Ag = , Bt = , Ce = , Cf = , Dm = , Dr = , Gg = ,
+  Hs = , Mm = , Mmu = , Pt = , Rn = paste0("org.", args$organism, ".eg.db"),
+  #At = "org.At.tair.db",
+  #Pf = "org.Pf.plasmo.db",
+  Sc = "org.Sc.sgd.db",
+  At = , EcK12 = , EcSakai = , Pf = , Ss = , Xl = stop(paste("Unsupported organism:", args$organism)),
+  stop(paste("Unknown organism:", args$organism)))
+pkgs <- c(
+  "argparse", "openxlsx", "readxl", "stringr", "tools", #, "XLConnect", "WriteXLS", 
+  "topGO", "AnnotationDbi", db)
+null <- lapply(pkgs, function(p) {
+  suppressWarnings(suppressMessages(hasp <- require(p, character.only = TRUE, quietly = TRUE)))
+  if (!hasp) stop(paste("Package", p, "not available"))
+  NULL
+})
+
+
+### read data
+
+
+if (args$verbose) cat("* reading data\n")
+stopifnot(all(file.exists(args$table)))
+D <- lapply(args$table, function (f) {
+  if (args$verbose) cat("  file:", f, "... ")
+  xlreader <- function(x) {
+    xs <- excel_sheets(x)
+    if (args$verbose) cat(" (sheets:", paste(xs, collapse = ", "), ") ... ")
+    #xd <- lapply(xs, read_excel, path = x) # does not recognize 'Inf' and '-Inf'
+    xd <- lapply(xs, read.xlsx, xlsxFile = x)
+    names(xd) <- xs
+    return(xd)
+  }
+  d <- switch(args$input_format,
+    tsv = list(read.delim(f, stringsAsFactors = F)),
+    csv = list(read.csv(f, stringsAsFactors = F)),
+    xlsx =  xlreader(f))
+  if (args$verbose) cat("done\n")
+  if (is.null(names(d))) names(d) <- ""  
+  d <- Map(function (x, xs) {
+    stopifnot(args$id_column %in% names(x))
+    stopifnot(args$expression_column %in% names(x))
+    stopifnot(nrow(x)>0)
+    x[[args$expression_column]] <- as.numeric(x[[args$expression_column]])
+    attr(x, "file_base") <- file_path_sans_ext(basename(f))
+    attr(x, "file_sheet") <- xs
+    return(x)
+  }, d, names(d))
+
+  names(d) <- paste0(sapply(d, attr, "file_base"), names(d))
+  return(d)
+})
+if (args$show_warnings) warnings()
+names(D) <- NULL
+D <- unlist(D, recursive = FALSE)
+n <- sapply(D, attr, "file_base")
+s <- sapply(D, attr, "file_sheet")
+i <- nchar(s)>0
+n[i] <- paste0(n[i], "_", s[i])
+names(D) <- n
+#str(D)
+#q('no')
+
+
+### enrich
+
+
+if (args$verbose) cat("* performing enrichment analysis\n")
+all <- expand.grid(datasets = names(D), ontologies = c("BP","CC","MF"), stringsAsFactors = FALSE)
+#all <- all[c(1,4,5,12),]
+#print(all)
+
+E <- Map(function(dataset, ontology) {
+
+  p.adj <- "fdr" # see ?p.adjust
+
+  if (args$verbose) cat("* analysing dataset", dataset, "\n")
+
+  # select data
+  d <- D[[dataset]]
+  g <- d[[args$id_column]]
+  s <- rep(TRUE, length(g)) # all genes are significant, data needs filtering before
+  e.cols <- c(args$expression_column, args$name_columns)
+  e <- if (is.null(e.cols)) NULL else d[e.cols]
+
+  # get gene universe
+  b <- keys(get(db), keytype = "ENSEMBL")
+  stopifnot(length(s) == length(g))
+  if (!is.null(e)) {
+    e <- as.data.frame(transform(e), stringsAsFactors = FALSE)
+    stopifnot(nrow(e) == length(g))
+    rownames(e) <- g
+  }
+
+  # determine sizes and set gene vectors
+  g.n <- length(g)
+  b.n <- length(b)
+  gb.names <- union(b, g) # union of query and background
+  gb.n <- length(gb.names)
+  gb <- rep(0L, gb.n) # 0 -> as.logical -> FALSE
+  names(gb) <- gb.names
+  s.n <- sum(s)
+  s.names <- g[s]
+  gb[s.names] <- 1L # 1 -> as.logical -> TRUE
+  if (!is.null(e))
+    e <- e[s.names,,drop=FALSE]
+
+  # test
+  if (args$verbose)
+    cat("  queried [significant]:      ", g.n, " [", s.n, "]\n",
+        "  universe/background:        ", b.n, "\n",
+        "  union (queried & universe): ", gb.n, "\n",
+        "  ontology:                   ", ontology, "\n", sep = "")
+  tobj <- new("topGOdata", ontology = ontology, description = "topgo",
+           allGenes = gb, geneSelectionFun = as.logical,
+           annotationFun = annFUN.org, mapping = "org.Dm.eg.db", ID = "Ensembl")
+  telim <- runTest(tobj, "elim", "fisher")
+  tclassic <- runTest(tobj, "classic", "fisher")
+  r <- GenTable(tobj, p.elimFisher = telim, p.classicFisher = tclassic,
+                orderBy = "p.elimFisher", ranksOf = "p.elimFisher",
+                topNodes = length(tobj@graph@nodes))
+  #t <- new("elimCount", testStatistic = GOFisherTest, name = "Fisher test")
+  #p <- getSigGroups(tobj, t)
+  #r <- GenTable(tobj, pvalCutOff = p, topNodes = length(tobj@graph@nodes))
+
+  # tidy table
+  r$log2Enrichment <- log2(r$Significant / r$Expected)
+  r <- data.frame(Ontology = ontology, r, stringsAsFactors = FALSE)
+  sne <- str_replace_all(r$p.elimFisher, "[^0-9e\\-\\.]*", "")
+  snc <- str_replace_all(r$p.classicFisher, "[^0-9e\\-\\.]*", "")
+  suppressWarnings(ne <- as.numeric(sne))
+  suppressWarnings(nc <- as.numeric(snc))
+  if (any(ne>1, nc>1) && args$verbose)
+    cat("    numeric format error in", sum(ne>1), "/", sum(nc>1), "(elim / classic) records\n")
+  r$p.elimFisher <- ne
+  r$p.classicFisher <- nc
+  na.e <- is.na(ne)
+  na.c <- is.na(nc)
+  if (any(na.e, na.c) && args$verbose)
+    cat("    numeric format mismatch in", sum(na.e), "/", sum(na.c), "(elim / classic)\n")
+  r$padj.elimFisher <- p.adjust(ne, p.adj)
+  r$padj.classicFisher <- p.adjust(nc, p.adj)
+  r$order.elimFisher <- order(ne)
+  r$order.classicFisher <- order(nc)
+
+  # map genes and other values
+  if (args$verbose) cat("  mapping annotated and significant gene ids\n")
+  ga <- genesInTerm(tobj)
+  ga <- ga[r$GO.ID]
+  ga[sapply(ga, is.null)] <- character()
+  names(ga) <- NULL
+  r$GenesAnnotated <- ga
+  r$GenesSignificant <- sapply(r$Genes, function (x) x[x %in% s.names])
+  if (!is.null(e)) {
+    if (args$verbose) cat("  mapping expression and/or other values to significant genes\n")
+    ei.rows <- lapply(r$GenesSignificant, function (x) {
+      if (length(x)) as.list(e[x,,drop=FALSE]) # get rows of e by gene (row)name, else
+      else as.list(rep(NA_real_, length(e)))   # missing values
+    })
+    # convert row-wise list to e's column wise list
+    ei <- lapply(names(e), function(x) {
+      lapply(ei.rows, "[[", x)
+    })
+    names(e)[which(names(e) == args$expression_column)] <- "Expression"
+    ei.names <- paste0("GenesSignificant", names(e))
+    ei <- structure(ei, names = ei.names, row.names = seq(nrow(r)), class = "data.frame")
+    row.names(ei) <- NULL
+    r <- data.frame(r, ei, stringsAsFactors = FALSE, check.names = FALSE)
+  }
+
+  # collapse all list columns to vectors
+  is.list <- sapply(r, is.list)
+  for (i in which(is.list)) {
+    r[[i]] <- sapply(r[[i]], paste, collapse = ", ")
+  }
+  
+  # return
+  attr(r, "file_base") <- attr(D[[dataset]], "file_base")
+  attr(r, "file_sheet") <- attr(D[[dataset]], "file_sheet")
+  attr(r, "ontology") <- ontology
+  return(r)
+
+}, dataset = all$datasets, ontology = all$ontologies) 
+# mcMap struggles with multiple AnnotationDbi / RSQLite database connections
+#str(E, list.len = 17)
+
+
+### write results
+
+
+if (args$verbose) cat("* exporting data\n")
+null <- lapply(E, function (e) {
+  n <- attr(e, "file_base")
+  s <- attr(e, "file_sheet")
+  o <- attr(e, "ontology")
+  if (nchar(s) > 0) n <- paste0(n, "_", s)
+  out <- paste0(args$output_prefix, n, "_", o, ".tsv")
+  if (args$verbose) cat("   writing", out, "... ")
+  write.table(e, file = out, sep = "\t", quote = F, row.names = F)
+  if (args$verbose) cat("done\n")
+  return(NULL)
+})
+
+if (args$output_xlsx) {
+  E_b <- sapply(E, attr, "file_base")
+  E_s <- sapply(E, attr, "file_sheet")
+  E_o <- sapply(E, attr, "ontology")
+  for (n in unique(E_b)) {
+    i <- which(E_b %in% n)
+    d <- E[i]
+    s <- paste(E_s[i], E_o[i])
+    out <- paste0(args$output_prefix, n, ".xlsx")
+    if (args$verbose) cat("   writing", out, "with sheets", paste(s, collapse = ", "), "... ")
+    
+    # use openxlsx
+    write.xlsx(setNames(d, s), file = out)
+
+    # use WriteXLS
+    #WriteXLS(d, out, s) # has problems with long strings in fields
+
+    # use XLConnect
+    #options(java.parameters = paste0("-Xmx", args$maximum_memory, "m")) # XLConnect
+    #wb <- loadWorkbook(out, create = TRUE)
+    #for (x in seq_along(d)) {
+    #  createSheet(wb, s[x])
+    #  writeWorksheet(wb, d[x], s[x])
+    #}
+    #saveWorkbook(wb)
+    
+    if (args$verbose) cat("done\n")
+  }
+}
+
+
+### done
+
+cat("* done\n")
+q("no")
+
+
+
