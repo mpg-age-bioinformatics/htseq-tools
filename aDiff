@@ -27,6 +27,7 @@ parser.add_argument("--filter", help="Filter to use to identify your genes.", de
 parser.add_argument("--listAttributes", help="List available attributes for your dataset.", action="store_true")
 parser.add_argument("--outputBiotypes", help="Outputs/attributes for your biotypes data. Order has to be kept, ie. first IDs then biotype.", default='ensembl_gene_id gene_biotype')
 parser.add_argument("--outputGoterms", help="Outputs/attributes for your goterms data. Order has to be kept, ie. 1st gene_id, then go_id, then go_term_name", default='ensembl_gene_id go_id name_1006')
+parser.add_argument("--KEGG",help="Add KEGG annotations", action="store_true")
 parser.add_argument("--listKEGGorganisms", help="List KEGG organisms.", action="store_true")
 parser.add_argument("--KEGGorg", help="KEGG organism.", default='cel')
 parser.add_argument("--findKEGGdb", help="KEGG has DB identifier for each linked DB. Use this function to find the label of your DB, eg: 'ensembl-hsa', 'FlyBase'. This option requires --originalGTF and --KEGGorg", action="store_true")
@@ -289,32 +290,34 @@ else:
 
 # generate KEGG table
 
-if os.path.isfile(genomes_folder+'/KEGG.txt'):
-    print "\nCopying already existing KEGG.txt file from genomes folder: "+str(genomes_folder)+"."
-    sys.stdout.flush()
-    shutil.copy(genomes_folder+'/KEGG.txt', python_output+'/KEGG.txt')
+if args.KEGG:
 
-elif os.path.isfile(python_output+'/KEGG.txt'):
-    print "\nUsing already existing KEGG.txt file"
-    sys.stdout.flush()
+    if os.path.isfile(genomes_folder+'/KEGG.txt'):
+        print "\nCopying already existing KEGG.txt file from genomes folder: "+str(genomes_folder)+"."
+        sys.stdout.flush()
+        shutil.copy(genomes_folder+'/KEGG.txt', python_output+'/KEGG.txt')
 
-else:
-    print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
-    sys.stdout.flush()
-    try:
-        df = age.KEGGmatrix(args.KEGGorg, args.dataset, args.mart) 
-        df = df[['ensembl_gene_id','KEGGid','pathIDs','pathName']] 
-    except:
-        print "\n\n!!! For this organism it was not possible to collect KEGG annotations from biomaRt. Using KEGG. Available KEGG dbs might not be up-to-date.\n\n"
-        kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
-        paths, paths_ = age.pathwaysKEGG(args.KEGGorg)
-        kegg_ens['KEGGid']=kegg_ens['KEGGid'].astype(str)
-        paths['KEGGid']=paths['KEGGid'].astype(str)        
-        df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')
-        df=df[['ENSid','KEGGid','pathIDs','pathName']]
-    df.columns = ['ensembl_gene_id','KEGGids','pathIDs','pathName']
-    df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
-    del df,paths_
+    elif os.path.isfile(python_output+'/KEGG.txt'):
+        print "\nUsing already existing KEGG.txt file"
+        sys.stdout.flush()
+
+    else:
+        print "\n%s\tGenerating KEGG table\n" %(str(datetime.now())[:16])
+        sys.stdout.flush()
+        try:
+            df = age.KEGGmatrix(args.KEGGorg, args.dataset, args.mart) 
+            df = df[['ensembl_gene_id','KEGGid','pathIDs','pathName']] 
+        except:
+            print "\n\n!!! For this organism it was not possible to collect KEGG annotations from biomaRt. Using KEGG. Available KEGG dbs might not be up-to-date.\n\n"
+            kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
+            paths, paths_ = age.pathwaysKEGG(args.KEGGorg)
+            kegg_ens['KEGGid']=kegg_ens['KEGGid'].astype(str)
+            paths['KEGGid']=paths['KEGGid'].astype(str)        
+            df=pd.merge(kegg_ens,paths,on=['KEGGid'],how='outer')
+            df=df[['ENSid','KEGGid','pathIDs','pathName']]
+        df.columns = ['ensembl_gene_id','KEGGids','pathIDs','pathName']
+        df.to_csv(python_output+"/KEGG.txt", sep= "\t", index=False)
+        del df,paths_
 
 
 # create excel report tables
@@ -324,7 +327,8 @@ if args.TSV:
 
 bio_go = pd.read_table(python_output+"/biotypes_go.txt", sep= "\t")
 name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t")
+if args.KEGG:
+    KEGG = pd.read_table(python_output+"/KEGG.txt", sep="\t")
 
 final_labels=pd.DataFrame()
 
@@ -372,7 +376,8 @@ for sig, label in zip(sig_choice,label_choice):
             df = df.reset_index()
             df = pd.merge(name_id, df, on='gene_id',how="right" ) 
             df = pd.merge(df, bio_go, how='left', on='ensembl_gene_id')
-            df = pd.merge(df,KEGG, how='left', on='ensembl_gene_id') ### keep on from here
+            if args.KEGG:
+                df = pd.merge(df,KEGG, how='left', on='ensembl_gene_id') ### keep on from here
             fl = df[['gene_id','gene','ensembl_gene_id']]
             final_labels = pd.concat([final_labels,fl])
             final_labels = final_labels.drop_duplicates()
