@@ -18,7 +18,7 @@ parser.add_argument("--col-nsign", help = "Column name for number of significant
 parser.add_argument("--col-nannotated", help = "Column name for number of annotated genes", default = 'Annotated')
 parser.add_argument("--col-deg", help = "Column name for differential gene expression (e.g. logFC-) values", default = "geneExpression")
 parser.add_argument("-f", "--format-deg", help = "Replace missing gene expression values by mean of values per term", action = "store_true")
-parser.add_argument("-n", "--nterms", help = "Number of terms to plot", default = 20)
+parser.add_argument("-n", "--nterms", help = "Number of terms to plot", default = 20, type = int)
 parser.add_argument("-o", "--output-folder", help = "Output directory", default = "goplots_output")
 
 #parser.add_argument("-i", "--input", help="Tab separated tables with the following collumns from an enrichment analysis: 'Enrichment', 'Significant', 'Annotated', 'Term', and 'log2fc'. For log2fc each cell must contain a comma separated string with the log2fc for the genes enriched in the respective term. eg. '-Inf,-1,2,3.4,3.66,Inf'")
