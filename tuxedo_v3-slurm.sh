@@ -226,7 +226,7 @@ for serie in $series; do
         
         # Use samtools to select mapped reads and sort them
 
-        samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 - ${file::(-16)}
+        samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 ${file::(-16)}.bam -
         mkdir ${top}stringtie_output/${file::(-16)}
 
         module load StringTie
