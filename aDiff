@@ -367,8 +367,8 @@ for sig, label in zip(sig_choice,label_choice):
                     print "Writing table "+label+"_"+outshort+".xlsx"
                     sys.stdout.flush()
 
-            df = df.sort('p_value')
-            df = df.sort('q_value')
+            df = df.sort_values(by=['p_value'])
+            df = df.sort_values(by=['q_value'])
             if sig == 'yes':
                 df = df[df['significant'] == 'yes']
             else:
