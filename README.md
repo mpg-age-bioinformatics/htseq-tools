@@ -318,7 +318,6 @@ optional arguments:
 ## License
 
 > Copyright 2015
-> * Jorge Boucas <JBoucas@age.mpg.de>
-> * Sven Templer <templer@age.mpg.de>
+> Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing
 
 See file `LICENSE`.
