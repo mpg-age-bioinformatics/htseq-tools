@@ -5,8 +5,6 @@
 # This version implements the alignment against the refseq transcriptome
 # using the meRanT (aligner = bowtie2) program.
 #
-# Author: Sven E. Templer <sven.templer@gmail.com>
-#
 # Copyright (c) 2016 Bioinformatics Core Facility of the
 # Max Planck Institute for Biology of Ageing, Cologne, Germany
 
