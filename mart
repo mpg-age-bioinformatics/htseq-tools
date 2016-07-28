@@ -4,7 +4,7 @@
 
 # mart - annotate tables with R/biomaRt
 #
-# Copyright 2015 - Sven E. Templer
+# Copyright 2016 - Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing
 #
 # dependencies:
 # python >= 2.7
