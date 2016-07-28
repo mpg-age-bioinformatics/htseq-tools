@@ -317,7 +317,6 @@ optional arguments:
 
 ## License
 
-> Copyright 2015
-> Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing
+Copyright 2016, Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing
 
 See file `LICENSE`.
