@@ -217,7 +217,7 @@ for serie in $series; do
 
         # HISAT call 
 
-        hisat2 -p 18 ${lib} --dta --met-file ${top}hisat_output/${file::(-16)}.stats \
+        hisat2 -p 18 ${lib} --dta-cufflinks --met-file ${top}hisat_output/${file::(-16)}.stats \
         -x ${hisat_index} -S ${top}hisat_output/${file::(-16)}.sam \
         ${files}
 
@@ -226,7 +226,7 @@ for serie in $series; do
         
         # Use samtools to select mapped reads and sort them
 
-        samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 ${file::(-16)}.bam -
+        samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 -o ${file::(-16)}.bam -
         mkdir ${top}stringtie_output/${file::(-16)}
 
         module load StringTie
