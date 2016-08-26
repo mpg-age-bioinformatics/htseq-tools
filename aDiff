@@ -416,14 +416,14 @@ for sig, label in zip(sig_choice,label_choice):
                                 dfDAVID['file_name'] = "_"+label+"_"+outshort+".xlsx" 
                                 DAVIDall=pd.concat([DAVIDall,dfDAVID])
 
-                                df_pair.drop(['test_id','index','gene_id','Unnamed: 0'], axis=1, inplace=True)                                
-                                if imp not in ['gene_exp.diff','isoform_exp.diff']:
-                                   df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
+                    df_pair.drop(['test_id','index','gene_id','Unnamed: 0'], axis=1, inplace=True)                                
+                    if imp not in ['gene_exp.diff','isoform_exp.diff']:
+                        df_pair.drop(['value_1','value_2','test_stat'], axis=1, inplace=True)
 
-                                if not args.TSVall:
-                                    df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
-                                else:                                
-                                    df_pair.to_csv(TSVout+label+'_'+outshort+'_'+sample1+'_vs_'+sample2+'.tsv',sep="\t", index=False)                                    
+                    if not args.TSVall:
+                        df_pair.to_excel(writer, sample1+'|'+sample2, index=False)
+                    else:                                
+                        df_pair.to_csv(TSVout+label+'_'+outshort+'_'+sample1+'_vs_'+sample2+'.tsv',sep="\t", index=False)                                    
 
             df.drop(['test_id','index','gene_id','Unnamed: 0'], axis=1, inplace=True)
 
