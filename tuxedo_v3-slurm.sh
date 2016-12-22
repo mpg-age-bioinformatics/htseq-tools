@@ -53,16 +53,15 @@ genome=${ann}/hisat/GRCm38.dna.toplevel.fa
 
 
 echo "Creating required folders"
-mkdir ../slurm_logs
-mkdir ../fastqc_output
-mkdir ../tmp
-mkdir ../flexbar_output
-mkdir ../hisat_output
-mkdir ../stringtie_output
-mkdir ../cuffmerge_output
-mkdir ../cuffdiff_output
-mkdir ../cuffquant_output
-
+mkdir -p ../slurm_logs
+mkdir -p ../fastqc_output
+mkdir -p ../tmp
+mkdir -p ../flexbar_output
+mkdir -p ../hisat_output
+mkdir -p ../stringtie_output
+mkdir -p ../cuffmerge_output
+mkdir -p ../cuffdiff_output
+mkdir -p ../cuffquant_output
 
 top=$(readlink -f ../)/
 tmp=$(readlink -f ../tmp)/
@@ -71,10 +70,7 @@ rawt=$(readlink -f ../flexbar_output)/
 merg=$(readlink -f ../cuffmerge_output)/ 
 qua=$(readlink -f ../cuffquant_output)/ 
 
-
-
 # Required function
-
 function contains() {
     local n=$#
     local value=${!n}
@@ -111,7 +107,7 @@ for serie in $series; do
 
         cd ${tmp} 
         chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
-        rm ../slurm_logs/fastqc_${file::(-9)}.*.out > /dev/null 2>&1  
+        rm -f ../slurm_logs/fastqc_${file::(-9)}.*.out 
         id=$(sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh)
         sleep 2
         ids=${ids}:${id:20}
@@ -166,7 +162,7 @@ for serie in $series; do
 
     cd ${tmp}
     chmod 755 ${tmp}flexbar_${file::(-8)}sh
-    rm ../slurm_logs/flexbar_${file::(-8)}*.out > /dev/null 2>&1  
+    rm -f ../slurm_logs/flexbar_${file::(-8)}*.out
     id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh)
     sleep 2
     ids=${ids}:${id:20}    
@@ -242,7 +238,7 @@ for serie in $series; do
 
         cd ${tmp}
         chmod 755 ${tmp}HS_ST_${file::(-16)}.sh 
-        rm ../slurm_logs/HS_ST_${file::(-16)}.*.out > /dev/null 2>&1
+        rm -f ../slurm_logs/HS_ST_${file::(-16)}.*.out
         id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/HS_ST_${file::(-16)}.%j.out ${tmp}HS_ST_${file::(-16)}.sh)
         sleep 2
         ids=${ids}:${id:20}
@@ -322,7 +318,7 @@ for serie in $series; do
         " > ${tmp}quant_${file::(-4)}.sh
         cd ${tmp}
         chmod 755 ${tmp}quant_${file::(-4)}.sh
-        rm ../slurm_logs/quant_${file::(-4)}.*.out > /dev/null 2>&1  
+        rm -f ../slurm_logs/quant_${file::(-4)}.*.out
         id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/quant_${file::(-4)}.%j.out ${tmp}quant_${file::(-4)}.sh)
         sleep 2
         ids=${ids}:${id:20}
@@ -365,7 +361,7 @@ rm ${tmp}diff_${serie}.sh" > ${tmp}diff_${serie}.sh
 for serie in ${series}; do
     cd ${tmp}
     chmod 755 ${tmp}diff_${serie}.sh
-    rm ../slurm_logs/diff_${serie}.*.out > /dev/null 2>&1  
+    rm -f ../slurm_logs/diff_${serie}.*.out  
     sbatch -p blade,himem,hugemem --mem=724gb --cpus-per-task=18 -o ../slurm_logs/diff_${serie}.%j.out ${tmp}diff_${serie}.sh
     sleep 2
 done
