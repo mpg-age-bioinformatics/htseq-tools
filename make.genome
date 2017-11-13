@@ -8,45 +8,22 @@ parser.add_argument("-i", "--multifasta", help="multifasta file")
 parser.add_argument("-o", "--output_file", help="Output file")
 args = parser.parse_args()
 
-multifasta=os.path.realpath(str(args.multifasta))
+infile=os.path.realpath(str(args.multifasta))
 output=args.output_file
 
-def write_fasta(fasta_in,output):
-    f2=open(output,'w')
-    with open(fasta_in, 'r+') as f:
-        sys.stdout.flush()
-        lines = f.readlines()
-        i=0
-        while i < len(lines):
-            line = lines[i]
-            if line[0] == ">":
-                print "\n"+str(line)
-                sys.stdout.flush()
-                fChr=line.split(" ")[0]
-                fChr=fChr[1:]
-                seq=str("")
-                s=i
-                code=['N','A','C','T','G']
-                firstbase=lines[s+1][0]
-                while firstbase in code:
-                    s=s + 1
-                    seq=seq+lines[s]
-                    if s < len(lines)-1:
-                        firstbase=lines[s+1][0]
-                    else:
-                        firstbase="!"
-                    #else:
-                    #    f2.write(str(fChr)+"\t"+str(len(seq)))
-                    #    print str(fChr)+"\t"+str(len(seq))
-                    #    sys.stdout.flush()
-                    #    sys.exit(0)
-                                                
-                f2.write(str(fChr)+"\t"+str(len(seq))+"\n")
-                print str(fChr)+"\t"+str(len(seq))
-                sys.stdout.flush()
-                i=s
+seq=[]
+with open(output, "w") as fout:
+    with open(infile, "r") as fa:
+        for line in fa:
+            l=line.split("\n")[0]
+            if ">" in l:
+                if len(seq) > 0:
+                    seq="".join(seq)
+                    print "##contig=<ID="+ref+",length="+str(len(seq))+">"
+                    sys.stdout.flush()
+                    fout.write(str(ref)+"\t"+str(len(seq))+"\n")
+                ref=l.split(">")[1]
+                seq=[]
             else:
-                i=i+1
-    f2.close
-                    
-write_fasta(multifasta,output)
+                seq.append(l)                   
+
