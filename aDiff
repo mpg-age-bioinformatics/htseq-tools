@@ -35,7 +35,7 @@ parser.add_argument("--KEGGdb", help="KEGG database linked to your ensembl organ
 parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids available in http://david.abcc.ncifcrf.gov/content.jsp?file=DAVID_API.html#input_list", default='WORMBASE_GENE_ID')
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list.", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,PFAM,PROSITE,GENETIC_ASSOCIATION_DB_DISEASE,OMIM_DISEASE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
-parser.add_argument("--host", help="Ensembl host. Check http://www.ensembl.org/info/website/archives/index.html for older releases.", default='ensembl.org') 
+parser.add_argument("--host", help="Ensembl host. Check http://www.ensembl.org/info/website/archives/index.html for older releases.", default="http://www.ensembl.org/biomart") 
 parser.add_argument("--AGEpy", help="Install AGEpy package with pip") 
 args = parser.parse_args()
 
@@ -72,6 +72,7 @@ import numpy as np
 import time
 from datetime import datetime
 import shutil
+from biomart import BiomartServer
 
 ############### FUNCTIONS ############
 
@@ -171,6 +172,16 @@ data_output_biotypes=args.outputBiotypes.split()
 
 data_output_goterms=args.outputGoterms.split()
 
+def QueryBioMart(dataset,attributes,host=args.host):
+    server = BiomartServer( host )
+    organism=server.datasets[dataset]
+    response=organism.search({'attributes':attributes})
+    response=response.content.split("\n")
+    response=[s.split("\t") for s in response ]
+    response=pd.DataFrame(response,columns=attributes)
+    return response
+
+
 ###################### START #####################
 
 os.chdir(diff_out)
@@ -224,30 +235,6 @@ else:
     
 
 # Use BioMart to retrieve biotypes and gene ontoloty information
-
-if os.path.isfile(genomes_folder+'/biotypes_go_raw.txt'):
-    print "\nCopying already existing biotypes_go_raw.txt file from genomes folder: "+str(genomes_folder)+"."
-    sys.stdout.flush()
-    shutil.copy(genomes_folder+'/biotypes_go_raw.txt', python_output+'/biotypes_go_raw.txt')
-
-elif os.path.isfile(python_output+'/biotypes_go_raw.txt'):
-    print "\nUsing already existing biotypes_go_raw.txt file"
-    sys.stdout.flush()
-
-else:
-    print "\nRetrieving biotypes and gene ontology information"
-    sys.stdout.flush()
-    biotypes=age.RqueryBM("with_embl",True,data_output_biotypes,args.dataset,args.mart,host=args.host)    
-    biotypes.columns=['ensembl_gene_id',data_output_biotypes[1]]
-    biotypes=biotypes[biotypes["ensembl_gene_id"].isin(genes)]    
- 
-    goterms=age.RqueryBM("with_embl",True,data_output_goterms,args.dataset,args.mart,host=args.host)   
-    goterms.columns=['ensembl_gene_id',data_output_goterms[1],data_output_goterms[2]]
-    goterms=goterms[goterms['ensembl_gene_id'].isin(genes)]    
-
-    bio_go=pd.merge(biotypes,goterms,on='ensembl_gene_id',how="outer")
-    bio_go.to_csv(python_output+'/biotypes_go_raw.txt', index=False, sep='\t')
-
 # generate biotypes and go terms table using R/biomart output table.
 
 if os.path.isfile(genomes_folder+'/biotypes_go.txt'):
@@ -261,28 +248,24 @@ elif os.path.isfile(python_output+'/biotypes_go.txt'):
 else:
     print "\nGenerating final biotypes and GO terms table"
     sys.stdout.flush()
+
+    bio_go=QueryBioMart(args.dataset,['ensembl_gene_id',data_output_biotypes[1],data_output_goterms[1],data_output_goterms[2]])
+    bio_go.to_csv(python_output+'/biotypes_go_raw.txt', index=False, sep='\t')
+
     name_id = pd.read_table(python_output+"/genes_table.txt", sep="\t")
-    ontology = pd.read_table(python_output+"/biotypes_go_raw.txt")
+    ontology = bio_go.copy() #pd.read_table(python_output+"/biotypes_go_raw.txt")
     ontology.columns = ['ensembl_gene_id','gene_biotype','GO_id','GO_term']
 
-    final = pd.DataFrame(columns = ['ensembl_gene_id','gene_biotype','GO_id','GO_term'])
+    def CombineAnn(df):
+        return pd.Series(dict(ensembl_gene_id = '; '.join([ str(s) for s in list(set(df['ensembl_gene_id']))  if str(s) != "nan" ] ) ,\
+                           gene_biotype = '; '.join([ str(s) for s in list(set(df['gene_biotype'])) if str(s) != "nan" ]), \
+                           GO_id = '; '.join([ str(s) for s in list(set(df['GO_id'])) if str(s) != "nan" ] ) ,\
+                           GO_term = '; '.join([ str(s) for s in list(set(df['GO_term'])) if str(s) != "nan" ] ) ,\
+                          ) ) 
 
-    for gene in list(set(ontology.ensembl_gene_id.tolist())):
-        ontology_gene = ontology[ontology['ensembl_gene_id'] == gene]
-        if len(ontology_gene) > 1:
-            GO_ids=ontology_gene['GO_id'].tolist()
-            GO_ids=[ str(s) for s in GO_ids ]
-            GO_ids="; ".join(GO_ids)
-            GO_term=ontology_gene['GO_term'].tolist()
-            GO_term=[ str(s) for s in GO_term ] 
-            GO_term="; ".join(GO_term)
-            biotype=ontology_gene['gene_biotype'].tolist()[0]
-            ontology_gene={"ensembl_gene_id":gene , 'gene_biotype':biotype , 'GO_id':GO_ids , 'GO_term':GO_term} 
-            ontology_gene=pd.DataFrame(ontology_gene,index=[0])
-        
-        final=pd.concat([final,ontology_gene])
-            
-    final.reset_index()
+    final=ontology.groupby(by="ensembl_gene_id", as_index=False).apply(CombineAnn)
+
+    final.reset_index(inplace=True, drop=True))
     final.to_csv(python_output+"/biotypes_go.txt", sep= "\t")
 
     del name_id, ontology, genes, ontology_gene, final
@@ -306,6 +289,7 @@ if args.KEGG:
         try:
             df = age.KEGGmatrix(args.KEGGorg, args.dataset, args.mart) 
             df = df[['ensembl_gene_id','KEGGid','pathIDs','pathName']] 
+        
         except:
             print "\n\n!!! For this organism it was not possible to collect KEGG annotations from biomaRt. Using KEGG. Available KEGG dbs might not be up-to-date.\n\n"
             kegg_ens=age.ensembl_to_kegg(args.KEGGorg,args.KEGGdb)
