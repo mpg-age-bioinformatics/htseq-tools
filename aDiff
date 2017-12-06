@@ -77,19 +77,24 @@ from biomart import BiomartServer
 ############### FUNCTIONS ############
 
 if args.listMarts:
-    print(age.RdatabasesBM(host=args.host))
+    
+    #print(age.RdatabasesBM(host=args.host))
+    age.databasesBM(host=args.host)
     sys.exit(0)
 
 if args.listDatasets:
-    print(age.RdatasetsBM(args.mart,host=args.host))
+    #print(age.RdatasetsBM(args.mart,host=args.host))
+    age.datasetsBM(args.mart,host=args.host)
     sys.exit(0)
 
 if args.listFilters:
-    print(age.RfiltersBM(args.dataset,args.mart,host=args.host ))
+    #print(age.RfiltersBM(args.dataset,args.mart,host=args.host ))
+    age.filtersBM(args.dataset, host=args.host )
     sys.exit(0)
 
 if args.listAttributes:
-    print(age.RattributesBM(args.dataset,args.mart,host=args.host))
+    #print(age.RattributesBM(args.dataset,args.mart,host=args.host))
+    age.attributesBM(args.dataset,host=args.host)
     sys.exit(0)
 
 if args.listKEGGorganisms:
