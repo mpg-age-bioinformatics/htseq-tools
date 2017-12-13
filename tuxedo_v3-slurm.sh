@@ -38,16 +38,17 @@ str=("Yid1" "OeDA" "RoSt" "HaTS" "HaIS" "AgMi" )
 
 # Which series do you which to work on:
 
-series="XHFC"
+series="HaIS"
 
 # Reference genome
 
-ann=/data/genomes/mus_musculus/GRCm38_79
-ori_GTF=$(readlink -f ${ann}/GRCm38.79.gtf)
-hisat_index=${ann}/hisat/GRCm38.dna.toplevel.fa
+ann=/beegfs/common/genomes/caenorhabditis_elegans/89/
+ori_GTF=${ann}original.gtf
+hisat_index=${ann}toplevel_hisat2/index.fa
 adapters_file=/beegfs/group_bit/home/JBoucas/documents/TruSeqAdapters.txt
-genome=${ann}/hisat/GRCm38.dna.toplevel.fa
+genome=${hisat_index}
 
+SHIFTER="shifter --image=mpgagebioinformatics/bioinformatics_software:v1.1.0"
 
 #############################################################################
 
@@ -69,6 +70,7 @@ raw=$(readlink -f ../raw_data)/
 rawt=$(readlink -f ../flexbar_output)/
 merg=$(readlink -f ../cuffmerge_output)/ 
 qua=$(readlink -f ../cuffquant_output)/ 
+logs=$(readlink -f ../slurm_logs)/
 
 # Required function
 function contains() {
@@ -88,90 +90,29 @@ function contains() {
 
 echo "Starting FASTQC"
 
-ids=
-
 cd ${raw} 
 for serie in $series; do
     cd ${raw}
+    
     for file in $(ls *${serie}*.fastq.gz); do 
-        echo "#!/bin/bash
-        module load pigz
-        module load FastQC
-        cp ${raw}${file} ${tmp}
-        cd ${tmp}
-        unpigz -p 4 ${file}
-        # FASTQC call
-        fastqc -t 4 -o ../fastqc_output ${file::(-3)}
-        rm ${tmp}fastqc_${file::(-9)}.sh
-        " > ${tmp}fastqc_${file::(-9)}.sh
+sbatch << EOF
+#!/bin/bash
+#SBATCH -o ${logs}${file%..fastq.gz}.%j.out
+#SBATCH -c 4
+module load shifter
 
-        cd ${tmp} 
-        chmod 755 ${tmp}fastqc_${file::(-9)}.sh 
-        rm -f ../slurm_logs/fastqc_${file::(-9)}.*.out 
-        id=$(sbatch -p blade,himem,hugemem --cpus-per-task=4 -o ../slurm_logs/fastqc_${file::(-9)}.%j.out ${tmp}fastqc_${file::(-9)}.sh)
-        sleep 2
-        ids=${ids}:${id:20}
-    done
-done
-
-echo "Waiting for FASTQC jobs${ids} to complete"
-srun -p blade,himem,hugemem -d afterok${ids} echo "FASTQC done. Starting Flexbar."
-
-#############################################################################
-
-ids=
-
+${SHIFTER} << SHI
+#!/bin/bash
+source ~/.bashrc
+module load fastqc
 cd ${raw}
-for serie in $series; do
-    cd ${raw}
-    for file in $(ls *${serie}*1.fastq.gz); do
-        cd ${raw}
-        if [[ -e ${file::(-10)}2.fastq.gz ]]; then
-            echo "#!/bin/bash 
-            module load pigz
-            module load Flexbar
+# FASTQC call
+fastqc -t 4 -o ../fastqc_output ${file}
+SHI
+EOF
 
-            # Flexbar call for paired end reads
-
-            flexbar -r ${tmp}${file::(-10)}1.fastq \
-            -p ${tmp}${file::(-10)}2.fastq -t ${top}flexbar_output/${file::(-11)} \
-            -n 18 -a ${adapters_file} \
-            -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
-            cd ${top}flexbar_output
-            pigz -p 18 ${file::(-10)}1.fastq
-            pigz -p 18 ${file::(-10)}2.fastq
-            rm ${tmp}flexbar_${file::(-8)}sh
-            " > ${tmp}flexbar_${file::(-8)}sh
-        else
-            echo "#!/bin/bash
-            module load pigz
-            module load Flexbar
-
-            # Flexbar call for single end reads
-
-            flexbar -r ${tmp}${file::(-10)}1.fastq \
-            -t ${top}flexbar_output/${file::(-11)}_1 \
-            -n 18 -a ${adapters_file} \
-            -ao 10 -u 5 -q 20 -m 20 -f i1.8 -ae ANY
-            cd ${top}flexbar_output
-            pigz -p 18 ${file::(-3)}
-            rm ${tmp}flexbar_${file::(-8)}sh
-            " > ${tmp}flexbar_${file::(-8)}sh
-
-        fi
-
-    cd ${tmp}
-    chmod 755 ${tmp}flexbar_${file::(-8)}sh
-    rm -f ../slurm_logs/flexbar_${file::(-8)}*.out
-    id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/flexbar_${file::(-8)}%j.out ${tmp}flexbar_${file::(-8)}sh)
-    sleep 2
-    ids=${ids}:${id:20}    
     done
 done
-
-echo "Waiting for Flexbar jobs${ids} to complete"
-srun -p blade,himem,hugemem -d afterok${ids} echo "FLEXBAR done. Starting HiSat and StringTie"
-
 
 #############################################################################
 
@@ -179,7 +120,7 @@ ids=
 
 cd ${rawt}
 for serie in $series; do
-    cd ${rawt}
+    cd ${raw}
     for file in $(ls *${serie}*1.fastq.gz); do
         
         # Libraries and paired end vs. single end settings for HISAT    
@@ -206,42 +147,49 @@ for serie in $series; do
             fi
         fi
 
-        echo "#!/bin/bash
-        cd ${rawt}
-        module load Bowtie2
-        module load HISAT
+rm -rf ${logs}HS_ST_${file::(-16)}.*.out 
 
-        # HISAT call 
+ids=${ids}:$(sbatch --parsable -o ${logs}HS_ST_${file::(-16)}.%j.out << EOF
+#!/bin/bash
+#SBATCH -p blade,himem,hugemem,dontuseme
+#SBATCH --cpus-per-task=18 
+module load shifter
 
-        hisat2 -p 18 ${lib} --dta-cufflinks --met-file ${top}hisat_output/${file::(-16)}.stats \
-        -x ${hisat_index} -S ${top}hisat_output/${file::(-16)}.sam \
-        ${files}
+${SHIFTER} << SHI       
+#!/bin/bash
+source ~/.bashrc
+cd ${raw}
+module load bowtie
+module load hisat
 
-        cd ${top}hisat_output
-        module load SAMtools
+# HISAT call 
+
+hisat2 -p 18 ${lib} --dta-cufflinks --met-file ${top}hisat_output/${file::(-16)}.stats \
+-x ${hisat_index} -S ${top}hisat_output/${file::(-16)}.sam \
+${files}
+
+cd ${top}hisat_output
+module load samtools
         
-        # Use samtools to select mapped reads and sort them
+# Use samtools to select mapped reads and sort them
 
-        samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 -o ${file::(-16)}.bam -
-        mkdir ${top}stringtie_output/${file::(-16)}
+samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 -o ${file::(-16)}.bam -
+rm -rf ${file::(-16)}.sam
+mkdir -p ${top}stringtie_output/${file::(-16)}
 
-        module load StringTie
+module load stringtie
 
-        # StringTie call
+# StringTie call
 
-        stringtie ${file::(-16)}.bam -o ${top}stringtie_output/${file::(-16)}.gtf \
-        -p 18 -G ${ori_GTF} -f 0.99 \
-        -C ${top}stringtie_output/${file::(-16)}_full_cov.gtf \
-        -b ${top}stringtie_output/${file::(-16)} 
-        rm ${tmp}HS_ST_${file::(-16)}.sh
-        " > ${tmp}HS_ST_${file::(-16)}.sh
+stringtie ${file::(-16)}.bam -o ${top}stringtie_output/${file::(-16)}.gtf \
+-p 18 -G ${ori_GTF} -f 0.99 \
+-C ${top}stringtie_output/${file::(-16)}_full_cov.gtf \
+-b ${top}stringtie_output/${file::(-16)} 
 
-        cd ${tmp}
-        chmod 755 ${tmp}HS_ST_${file::(-16)}.sh 
-        rm -f ../slurm_logs/HS_ST_${file::(-16)}.*.out
-        id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/HS_ST_${file::(-16)}.%j.out ${tmp}HS_ST_${file::(-16)}.sh)
-        sleep 2
-        ids=${ids}:${id:20}
+SHI
+EOF
+)
+
     done
 done
 
@@ -250,11 +198,12 @@ srun -p blade,himem,hugemem -d afterok${ids} echo "HiSat and StringTie done. Sta
  
 #############################################################################
 
+
 for serie in $series; do
-    rm ${tmp}assemblies_${serie}.txt
+    rm -rf ${tmp}assemblies_${serie}.txt
 
     cd ${top}stringtie_output
-    mkdir full_coverage
+    mkdir -p full_coverage
     mv *_full_cov.gtf full_coverage
     
     # Select only transcripts which have full coverage
@@ -265,22 +214,37 @@ for serie in $series; do
     done
 
     cd ${top}
-    mkdir cuffmerge_output/${serie}
+    mkdir -p cuffmerge_output/${serie}
     cmout=$(readlink -f cuffmerge_output/${serie})/
     echo ${serie}
+id=$(sbatch --parsable << EOF
+#!/bin/bash
+#SABTCH -p blade,himem,hugemem,dontuseme
+#SBATCH -o ${logs}cuffmerge.${serie}.%j.out
 
-    cd ${top}
-    module load Cufflinks
+module load shifter
+
+${SHIFTER} << SHI
+#!/bin/bash
+source ~/.bashrc
+cd ${top}
+
+module load cufflinks
     
-    # Cuffmerge call
+# Cuffmerge call
 
-    srun -p blade,himem,hugemem --cpus-per-task=2 cuffmerge -p 2 \
-    -o ${cmout} --min-isoform-fraction 1.0 \
-    -g ${ori_GTF} -s ${genome} ${tmp}assemblies_${serie}.txt
+cuffmerge -p 2 \
+-o ${cmout} --min-isoform-fraction 1.0 \
+-g ${ori_GTF} -s ${genome} ${tmp}assemblies_${serie}.txt
+
+SHI
+EOF
+)
 done
 
+srun -p blade,himem,hugemem -d afterok:${id} echo "Done with cuffmerge"
+
 cd ${tmp}
-cd ../scripts
 
 #############################################################################
 
@@ -302,68 +266,76 @@ for serie in $series; do
 
     cd ${top}hisat_output
     for file in $(ls *${serie}*.bam); do 
-        echo "#!/bin/bash
-        cd ${top}cuffquant_output
-        mkdir ${serie}
-        cd ${serie}
-        module load Cufflinks
+rm -rf ${logs}quant_${file::(-4)}.*.out
+ids=${ids}:$(sbatch --parsable << EOF
+#!/bin/bash
+#SBATCH -p blade,himem,hugemem,dontuseme
+#SBATCH --cpus-per-task=18 
+#SBATCH -o ${logs}quant_${file::(-4)}.%j.out
+module load shifter
 
-        # Cuffquant call
+${SHIFTER} << SHI       
+#!/bin/bash
+source ~/.bashrc
+cd ${top}cuffquant_output
+mkdir ${serie}
+cd ${serie}
+module load cufflinks
 
-        cuffquant -p 18 --library-type ${lib} \
-        -o ${file::(-4)} \
-        ${top}cuffmerge_output/${serie}/merged.gtf \
-        ${top}hisat_output/${file}
-        rm ${tmp}quant_${file::(-4)}.sh
-        " > ${tmp}quant_${file::(-4)}.sh
-        cd ${tmp}
-        chmod 755 ${tmp}quant_${file::(-4)}.sh
-        rm -f ../slurm_logs/quant_${file::(-4)}.*.out
-        id=$(sbatch -p blade,himem,hugemem --cpus-per-task=18 -o ../slurm_logs/quant_${file::(-4)}.%j.out ${tmp}quant_${file::(-4)}.sh)
-        sleep 2
-        ids=${ids}:${id:20}
+# Cuffquant call
+
+cuffquant -p 18 --library-type ${lib} \
+-o ${file::(-4)} \
+${top}cuffmerge_output/${serie}/merged.gtf \
+${top}hisat_output/${file}
+SHI
+EOF
+)
     done
 done
 
+
 echo "Waiting for cuffquant jobs${ids} to complete"
-srun -p blade,himem,hugemem -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
+srun -p blade,himem,hugemem,dontuseme -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
 
 
 #############################################################################
 
-
 #### cuff diff >>>> one section per serie ######
 
-serie=XHFC
-mkdir ${top}cuffdiff_output/${serie}
+serie=HaIS
+mkdir -p ${top}cuffdiff_output/${serie}
 dout=$(readlink -f ${top}cuffdiff_output/${serie})
-lib="fr-unstranded"
+lib="fr-firststrand"
 
-echo "#!/bin/bash
+rm -rf ${logs}cuffdiff.${serie}.*.out
+sbatch --parsable << EOF
+#!/bin/bash
+#SBATCH -p blade,himem,hugemem,dontuseme
+#SBATCH --cpus-per-task=18 
+#SBATCH -o ${logs}cuffdiff.${serie}.%j.out
+module load shifter
+${SHIFTER} << SHI       
+#!/bin/bash
+source ~/.bashrc
+
+#!/bin/bash
 cd ${qua}${serie}
 
-module load Cufflinks
+module load cufflinks
 
 # Cuffdiff call
 
 cuffdiff -p 18 --library-type ${lib} \
--L Fema_Y,Male_Y,Male_O \
+-L N2,daf2 \
 -o ${dout} --dispersion-method per-condition \
-${top}cuffmerge_output/${series}/merged.gtf \
-S_002-F_XHFC-L_____F-__Y-____-REP_2/abundances.cxb,S_003-F_XHFC-L_____F-__Y-____-REP_3/abundances.cxb,S_004-F_XHFC-L_____F-__Y-____-REP_4/abundances.cxb,S_006-F_XHFC-L_____F-__Y-____-REP_6/abundances.cxb,S_007-F_XHFC-L_____F-__Y-____-REP_7/abundances.cxb,S_008-F_XHFC-L_____F-__Y-____-REP_8/abundances.cxb \
-S_009-F_XHFC-L_____M-__Y-____-REP_1/abundances.cxb,S_010-F_XHFC-L_____M-__Y-____-REP_2/abundances.cxb,S_011-F_XHFC-L_____M-__Y-____-REP_3/abundances.cxb,S_012-F_XHFC-L_____M-__Y-____-REP_4/abundances.cxb,S_013-F_XHFC-L_____M-__Y-____-REP_5/abundances.cxb,S_014-F_XHFC-L_____M-__Y-____-REP_6/abundances.cxb,S_015-F_XHFC-L_____M-__Y-____-REP_7/abundances.cxb \
-S_017-F_XHFC-L_____M-__O-____-REP_1/abundances.cxb,S_018-F_XHFC-L_____M-__O-____-REP_2/abundances.cxb,S_019-F_XHFC-L_____M-__O-____-REP_3/abundances.cxb,S_020-F_XHFC-L_____M-__O-____-REP_4/abundances.cxb,S_021-F_XHFC-L_____M-__O-____-REP_5/abundances.cxb
+${top}cuffmerge_output/${serie}/merged.gtf \
+S_160-F_HaIS-L____N2-___-____-REP_1/abundances.cxb,S_161-F_HaIS-L____N2-___-____-REP_2/abundances.cxb,S_162-F_HaIS-L____N2-___-____-REP_3/abundances.cxb \
+S_163-F_HaIS-L__daf2-___-____-REP_1/abundances.cxb,S_164-F_HaIS-L__daf2-___-____-REP_2/abundances.cxb,S_165-F_HaIS-L__daf2-___-____-REP_3/abundances.cxb
 
-rm ${tmp}diff_${serie}.sh" > ${tmp}diff_${serie}.sh
+SHI
+EOF
 
 #### END section
-
-for serie in ${series}; do
-    cd ${tmp}
-    chmod 755 ${tmp}diff_${serie}.sh
-    rm -f ../slurm_logs/diff_${serie}.*.out  
-    sbatch -p blade,himem,hugemem --mem=724gb --cpus-per-task=18 -o ../slurm_logs/diff_${serie}.%j.out ${tmp}diff_${serie}.sh
-    sleep 2
-done
 
 exit
