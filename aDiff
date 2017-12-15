@@ -36,8 +36,15 @@ parser.add_argument("--DAVIDid", help="DAVID's id for your dataset. List of ids 
 parser.add_argument("--DAVIDcat", help="DAVID's categories you wish to analyse. List of available categories in https://david.ncifcrf.gov/content.jsp?file=DAVID_API.html#approved_list.", default='GOTERM_BP_FAT,GOTERM_CC_FAT,GOTERM_MF_FAT,KEGG_PATHWAY,PFAM,PROSITE,GENETIC_ASSOCIATION_DB_DISEASE,OMIM_DISEASE')
 parser.add_argument("-u", "--DAVIDuser", help="Your DAVID's user id. example: 'John.Doe@age.mpg.de'")
 parser.add_argument("--host", help="Ensembl host. Check http://www.ensembl.org/info/website/archives/index.html for older releases.", default="http://www.ensembl.org/biomart") 
-parser.add_argument("--AGEpy", help="Install AGEpy package with pip") 
+#parser.add_argument("--AGEpy", help="Install AGEpy package with pip") 
+parser.add_argument("--species", help="Species for string app query. eg. 'caenorhabditis elegans', 'drosophila melanogaster', 'mus musculus', 'homo sapiens'. Default='caenorhabditis elegans'", default='caenorhabditis elegans'
+parser.add_argument("--limit", help="Limit for string app query. Number of extra genes to recover. If None, limit=N(query_genes)*.25"
+parser.add_argument("--cuttoff", help="Confidence cuttoff for sting app query. Default=0.4", default=0.4)
+parser.add_argument("--taxon", help="Taxon id for string app query. For the species shown above, taxon id will be automatically identified.")
+parser.add_argument("--cytoscape_host", help="Host address for cytoscape.")
+parser.add_argument("--cytoscape_port", help="Cytoscape port.")
 args = parser.parse_args()
+
 
 if args.description:
     print "\nThis script annotates gene_exp.diff, promoters.diff, splicing.diff, cds.diff, and isoform_exp.diff cuffdiff tables. \
@@ -49,23 +56,23 @@ cellular component (CC), and molecular function (MF).\n \nRequired python packag
 \n\n*************************************\nDeveloped by Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing\n\n"
     sys.exit(0)
 
-try:
-    import AGEpy.AGEpy as age
-except ImportError:
-    print "You don't have AGEpy package installed.\nFollow the instructions on https://github.com/mpg-age-bioinformatics/AGEpy to install this package or use 'aDiff --AGEpy' to install it with pip."
-    sys.exit(0)
+#try:
+#    import AGEpy.AGEpy as age
+#except ImportError:
+#    print "You don't have AGEpy package installed.\nFollow the instructions on https://github.com/mpg-age-bioinformatics/AGEpy to install this package or use 'aDiff --AGEpy' to install it with pip."
+#    sys.exit(0)
 
-if args.AGEpy:
-    try:
-        import pip
-        print "With --AGEpy, only the AGEpy package and it's dependencies will be installed no analysis will performed"
-        sys.stdout.flush()
-        pip.main(['install','--user','AGEpy'])
-        sys.exit(0)
-    except ImportError:
-        print "You don't have pip.\nPlease install pip first."
-        sys.stdout.flush()
-        sys.exit(0)
+#if args.AGEpy:
+#    try:
+#        import pip
+#        print "With --AGEpy, only the AGEpy package and it's dependencies will be installed no analysis will performed"
+#        sys.stdout.flush()
+#        pip.main(['install','--user','AGEpy'])
+#        sys.exit(0)
+#    except ImportError:
+#        print "You don't have pip.\nPlease install pip first."
+#        sys.stdout.flush()
+#        sys.exit(0)
 
 import pandas as pd
 import numpy as np
@@ -320,6 +327,14 @@ if args.KEGG:
 
 final_labels=pd.DataFrame()
 
+if args.string:
+    homdf=age.FilterGOstring()
+    aging_genes=homdf[[args.organismtag+"_ensembl_gene_id","evidence"]].dropna()
+    aging_genes=aging_genes[aging_genes[args.organismtag+"_ensembl_gene_id"]!="None"]
+    aging_genes=aging_genes[args.organismtag+"_ensembl_gene_id"].tolist()
+    cytoscape_output=python_output+"/cytoscape"
+    if not os.path.isdir(cytoscape_output):
+        os.makedirs(cytoscape_output)
 
 for sig, label in zip(sig_choice,label_choice):
     if sig != 'yes':
@@ -390,6 +405,12 @@ for sig, label in zip(sig_choice,label_choice):
                     sample2=s[1]
 
                     df_pair = df[df['sample_1']==sample1][df['sample_2']==sample2]
+                    
+                    if args.string:
+                        target=cytoscape_output+'/'sample1+'_vs_'+sample2
+                        age.aDiffCytoscape(df_pair,aging_genes,target,species=args.species,limit=args.limit, cutoff=ags.cuttoff,taxon=args.taxon,cytoscape_host=args.cytoscape_host,cytoscape_port=args.cytoscape_port)
+    
+
                     if args.DAVID:
                         print "\nPerforming DAVID enrichment analysis on "+sample1+' vs. '+sample2
                         sys.stdout.flush()
