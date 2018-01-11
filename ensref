@@ -127,15 +127,13 @@ fi
 module purge
 echo "* loading software environment"
 module load slurm
-module load Bowtie2
-module load TopHat
-module load BWA
+module load bowtie
+module load tophat
+module load bwa
 module load star/${VER_STAR}
-module load HISAT
-module load hisat2
-module load Cufflinks
-module load Bowtie2
-module load TopHat
+#module load hisat
+module load hisat
+module load cufflinks
 VER_STAR_ERROR=$(module load star/$VER_STAR 2>&1)
 if [[ -n $VER_STAR_ERROR ]]
 then
@@ -361,31 +359,31 @@ echo done
       sbatch -p dontuseme -N 1 -o log/${name}.log -J $jobname -n 12 --mem=150GB log/${name}.sh
     fi
 
-    #######
-    ### hisat
-    #######
-  
-    name=${label_fa}_hisat
-    if [[ -d $name ]]
-    then
-      echo "* indexing $name: skipped (remove folder to rebuild)"
-    else
-      echo "* indexing $name"
-      jobname=ensref_${ORGANISM}_${RELEASE}_$name
-      cmd="#!/bin/bash
-date
-which hisat
-mkdir $name
-cd $name
-ln -s ../$fa index.fa
-hisat-build index.fa index.fa
-echo done
-"
-  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
-      echo "$cmd" > log/${name}.sh
-      chmod u+x log/${name}.sh
-      sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
-    fi
+#    #######
+#    ### hisat
+#    #######
+#  
+#    name=${label_fa}_hisat
+#    if [[ -d $name ]]
+#    then
+#      echo "* indexing $name: skipped (remove folder to rebuild)"
+#    else
+#      echo "* indexing $name"
+#      jobname=ensref_${ORGANISM}_${RELEASE}_$name
+#      cmd="#!/bin/bash
+#date
+#which hisat
+#mkdir $name
+#cd $name
+#ln -s ../$fa index.fa
+#hisat-build index.fa index.fa
+#echo done
+#"
+#  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
+#      echo "$cmd" > log/${name}.sh
+#      chmod u+x log/${name}.sh
+#      sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
+#    fi
 
 
     #######
@@ -401,6 +399,7 @@ echo done
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 date
+module load hisat
 which hisat2
 mkdir $name
 cd $name
