@@ -23,8 +23,21 @@ Make sure you have edited the last section of this script - cuffdiff - before yo
 
 #############################################################################
 
-# Define series as SE or PE and stranded or unstranded
+# TODO: Set General pipeline settings
+# MPI-Age Settings
+HOMESOURCE="source ~/.bashrc"
+SLURMPARTITION="blade,himem,hugemem,dontuseme"
+SHIFTER="shifter --image=mpgagebioinformatics/bioinformatics_software:v1.1.0"
+SHIFTERSEQC="shifter --image=paulklemm/seqc"
 
+# MPI-MR Settings
+# MPI-MR The $HOME export in .bashrc is not honored, thats why we have to make it explicit here
+#HOMESOURCE="source /beegfs/scratch/bruening_scratch/pklemm/shifter/home/.bashrc && HOME=/beegfs/scratch/bruening_scratch/pklemm/shifter/home/"
+#SLURMPARTITION="blade-b"
+#SHIFTER="/beegfs/bin/shifter/latest/bin/shifter --image=mpgagebioinformatics/bioinformatics_software:v1.1.3 bash"
+#SHIFTERSEQC="/beegfs/bin/shifter/latest/bin/shifter --image=paulklemm/seqc bash"
+
+# TODO: Define series as SE or PE and stranded or unstranded
 SE_unstr=("YiTS" "YiDR" "YiIS" "ShTe")
 SE_str=("Yid1" "OeDA" "AgMi")
 PE_str=("RoSt" "HaTS" "HaIS")
@@ -40,15 +53,12 @@ str=("Yid1" "OeDA" "RoSt" "HaTS" "HaIS" "AgMi" )
 
 series="HaIS"
 
-# Reference genome
-
+# TODO: Reference genome
 ann=/beegfs/common/genomes/caenorhabditis_elegans/89/
 ori_GTF=${ann}original.gtf
 hisat_index=${ann}toplevel_hisat2/index.fa
 adapters_file=/beegfs/group_bit/home/JBoucas/documents/TruSeqAdapters.txt
 genome=${hisat_index}
-
-SHIFTER="shifter --image=mpgagebioinformatics/bioinformatics_software:v1.1.0"
 
 #############################################################################
 
@@ -63,6 +73,9 @@ mkdir -p ../stringtie_output
 mkdir -p ../cuffmerge_output
 mkdir -p ../cuffdiff_output
 mkdir -p ../cuffquant_output
+#mkdir -p ../featureCounts_output
+mkdir -p ../multiqc_output
+mkdir -p ../seqc_output
 
 top=$(readlink -f ../)/
 tmp=$(readlink -f ../tmp)/
@@ -70,7 +83,23 @@ raw=$(readlink -f ../raw_data)/
 rawt=$(readlink -f ../flexbar_output)/
 merg=$(readlink -f ../cuffmerge_output)/ 
 qua=$(readlink -f ../cuffquant_output)/ 
+mqc=$(readlink -f ../multiqc_output)/ 
 logs=$(readlink -f ../slurm_logs)/
+
+# Biotypes header for featureCounts call
+biotypes_header=$(cat <<'EOF'
+# id: 'biotype-counts'
+# section_name: 'Biotype Counts'
+# description: 'shows reads overlapping genomic features of different biotypes, counted by featureCounts (http://bioinf.wehi.edu.au/featureCounts).'
+# plot_type: 'bargraph'
+# anchor: 'featurecounts_biotype'
+# pconfig:
+#     id: 'featureCounts_biotype_plot'
+#     title: 'featureCounts: Biotypes'
+#     xlab: '# Reads'
+#     cpswitch_counts_label: 'Number of Reads'
+EOF
+);
 
 # Required function
 function contains() {
@@ -95,15 +124,17 @@ for serie in $series; do
     cd ${raw}
     
     for file in $(ls *${serie}*.fastq.gz); do 
-sbatch << EOF
+sbatch --partition $SLURMPARTITION << EOF
 #!/bin/bash
-#SBATCH -o ${logs}${file%..fastq.gz}.%j.out
+#SBATCH --output ${logs}${file%..fastq.gz}.%j.out
+#SBATCH --error ${logs}${file%..fastq.gz}.%j.err
 #SBATCH -c 4
+#SBATCH --job-name='fastqc'
 module load shifter
 
 ${SHIFTER} << SHI
 #!/bin/bash
-source ~/.bashrc
+${HOMESOURCE}
 module load fastqc
 cd ${raw}
 # FASTQC call
@@ -149,15 +180,15 @@ for serie in $series; do
 
 rm -rf ${logs}HS_ST_${file::(-16)}.*.out 
 
-ids=${ids}:$(sbatch --parsable -o ${logs}HS_ST_${file::(-16)}.%j.out << EOF
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable -o ${logs}HS_ST_${file::(-16)}.%j.out << EOF
 #!/bin/bash
-#SBATCH -p blade,himem,hugemem,dontuseme
 #SBATCH --cpus-per-task=18 
+#SBATCH --job-name='HS_ST'
 module load shifter
 
-${SHIFTER} << SHI       
+${SHIFTER} << SHI
 #!/bin/bash
-source ~/.bashrc
+${HOMESOURCE}
 cd ${raw}
 module load bowtie
 module load hisat
@@ -170,7 +201,7 @@ ${files}
 
 cd ${top}hisat_output
 module load samtools
-        
+
 # Use samtools to select mapped reads and sort them
 
 samtools view -@ 18 -bhS -F 4 ${file::(-16)}.sam | samtools sort -@ 18 -o ${file::(-16)}.bam -
@@ -194,7 +225,7 @@ EOF
 done
 
 echo "Waiting for HISAT and StringTie jobs${ids} to complete"
-srun -p blade,himem,hugemem -d afterok${ids} echo "HiSat and StringTie done. Starting cuffmerge"
+srun --partition $SLURMPARTITION -d afterok${ids} echo "HiSat and StringTie done. Starting cuffmerge"
  
 #############################################################################
 
@@ -217,16 +248,16 @@ for serie in $series; do
     mkdir -p cuffmerge_output/${serie}
     cmout=$(readlink -f cuffmerge_output/${serie})/
     echo ${serie}
-id=$(sbatch --parsable << EOF
+id=$(sbatch --partition $SLURMPARTITION --parsable << EOF
 #!/bin/bash
-#SABTCH -p blade,himem,hugemem,dontuseme
 #SBATCH -o ${logs}cuffmerge.${serie}.%j.out
+#SBATCH --job-name='cffmrg'
 
 module load shifter
 
 ${SHIFTER} << SHI
 #!/bin/bash
-source ~/.bashrc
+${HOMESOURCE}
 cd ${top}
 
 module load cufflinks
@@ -242,7 +273,7 @@ EOF
 )
 done
 
-srun -p blade,himem,hugemem -d afterok:${id} echo "Done with cuffmerge"
+srun --partition $SLURMPARTITION -d afterok:${id} echo "Done with cuffmerge"
 
 cd ${tmp}
 
@@ -267,16 +298,16 @@ for serie in $series; do
     cd ${top}hisat_output
     for file in $(ls *${serie}*.bam); do 
 rm -rf ${logs}quant_${file::(-4)}.*.out
-ids=${ids}:$(sbatch --parsable << EOF
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
 #!/bin/bash
-#SBATCH -p blade,himem,hugemem,dontuseme
 #SBATCH --cpus-per-task=18 
 #SBATCH -o ${logs}quant_${file::(-4)}.%j.out
+#SBATCH --job-name='cffqnt'
 module load shifter
 
-${SHIFTER} << SHI       
+${SHIFTER} << SHI
 #!/bin/bash
-source ~/.bashrc
+${HOMESOURCE}
 cd ${top}cuffquant_output
 mkdir ${serie}
 cd ${serie}
@@ -296,28 +327,31 @@ done
 
 
 echo "Waiting for cuffquant jobs${ids} to complete"
-srun -p blade,himem,hugemem,dontuseme -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
+srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
 
 
 #############################################################################
 
 #### cuff diff >>>> one section per serie ######
 
+ids=
+
+# TODO: Set serie
 serie=HaIS
 mkdir -p ${top}cuffdiff_output/${serie}
 dout=$(readlink -f ${top}cuffdiff_output/${serie})
 lib="fr-firststrand"
 
 rm -rf ${logs}cuffdiff.${serie}.*.out
-sbatch --parsable << EOF
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
 #!/bin/bash
-#SBATCH -p blade,himem,hugemem,dontuseme
 #SBATCH --cpus-per-task=18 
 #SBATCH -o ${logs}cuffdiff.${serie}.%j.out
+#SBATCH --job-name='cffdff'
 module load shifter
-${SHIFTER} << SHI       
+${SHIFTER} << SHI
 #!/bin/bash
-source ~/.bashrc
+${HOMESOURCE}
 
 #!/bin/bash
 cd ${qua}${serie}
@@ -326,6 +360,7 @@ module load cufflinks
 
 # Cuffdiff call
 
+# TODO: Set cxb files and -L labels
 cuffdiff -p 18 --library-type ${lib} \
 -L N2,daf2 \
 -o ${dout} --dispersion-method per-condition \
@@ -335,7 +370,88 @@ S_163-F_HaIS-L__daf2-___-____-REP_1/abundances.cxb,S_164-F_HaIS-L__daf2-___-____
 
 SHI
 EOF
+)
 
+echo "Waiting for Cuffdiff jobs${ids} to complete"
+srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffdiff done. Starting MultiQC and seqc."
+
+#### END section
+
+#############################################################################
+
+
+#### MultiQC
+
+rm -rf ${logs}multiqc.*.out
+sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --cpus-per-task=1
+#SBATCH -o ${logs}multiqc.%j.out
+#SBATCH --job-name='multiqc'
+
+${SHIFTER} << SHI
+#!/bin/bash
+${HOMESOURCE}
+# The $HOME export in .bashrc is not honored, thats why we have to make it explicit here
+export HOME=/beegfs/scratch/bruening_scratch/pklemm/shifter/home/
+
+# Install multiqc
+module load python
+pip install multiqc --user
+
+cd ${top}
+multiqc . -f -o ${mqc}
+
+SHI
+EOF
+
+#### END section
+
+#############################################################################
+
+#### Seqc of Cuffdiff result
+
+# Reset IDs
+ids=
+
+for serie in $series; do
+  # Set path for cuffdiff result of series
+  cuffdiff_path=${top}cuffdiff_output/${serie}
+  # Set seqc output path
+  output_path=${top}seqc_output/${serie}
+  # Create seqc outout path
+  mkdir $output_path
+  # Remove existing logs of seqc
+  rm -rf ${logs}seqc.*.out
+
+# Slurm call for series
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --cpus-per-task=1
+#SBATCH -o ${logs}seqc.%j.out
+#SBATCH --job-name='seqc'
+
+echo $cuffdiff_path
+echo $output_path
+
+# Run SEQC shifter image
+${SHIFTERSEQC} << SHI
+#!/bin/bash
+Rscript -e "library(seqc); createHTMLReport(cuffdiff_path = '${cuffdiff_path}', output_path = '${output_path}', save_plots = FALSE)"
+# library(seqc)
+# createHTMLReport(
+#   cuffdiff_path = ${cuffdiff_path},
+#   output_path = ${output_path},
+#   save_plots = FALSE
+# )
+SHI
+EOF
+)
+# Close "for serie in $series; do" loop
+done
+
+echo "Waiting for seqc jobs${ids} to complete"
+srun --partition $SLURMPARTITION -d afterok${ids} echo "Tuxedo_v3 pipeline done."
 #### END section
 
 exit
