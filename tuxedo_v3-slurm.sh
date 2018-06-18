@@ -60,6 +60,14 @@ hisat_index=${ann}toplevel_hisat2/index.fa
 adapters_file=/beegfs/group_bit/home/JBoucas/documents/TruSeqAdapters.txt
 genome=${hisat_index}
 
+# TODO: Set aDiff Options
+# aDiff Options
+ORGANISMTAG="MUS"
+SPECIES="'mus musculus'"
+DATASET="mmusculus_gene_ensembl"
+DAVIDUSER="Registered.Email@david.com" \
+HOST="http://dec2017.archive.ensembl.org/biomart/"
+
 #############################################################################
 
 
@@ -451,6 +459,62 @@ EOF
 done
 
 echo "Waiting for seqc jobs${ids} to complete"
+srun --partition $SLURMPARTITION -d afterok${ids} echo "Seqc is done. Starting aDiff."
+#### END section
+
+#### aDiff of Cuffdiff results
+
+# Reset IDs
+ids=
+
+for serie in $series; do
+  # Set path for cuffdiff result of series
+  cuffdiff_path=${top}cuffdiff_output/${serie}
+  # Set path for cuffmerge result of series
+  cuffmerge_path=${top}cuffmerge_output/${serie}
+  # Set adiff output path
+  output_path=${top}adiff_output/${serie}
+  # Create adiff outout path
+  mkdir $output_path
+  # Remove existing logs of adiff
+  rm -rf ${logs}adiff.*.out
+
+# Slurm call for series
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --cpus-per-task=1
+#SBATCH -o ${logs}adiff.%j.out
+#SBATCH --job-name='adiff'
+
+# Run SEQC shifter image
+${SHIFTER} << SHI
+#!/bin/bash
+${HOMESOURCE}
+cd ${top}
+module load python
+pip install AGEpy --user
+# Run aDiff command
+aDiff \
+    --inputFolder $cuffdiff_path \
+    --outputFolder $output_path \
+    --originalGTF ${ori_GTF} \
+    --cuffcompareGTF ${cuffmerge_path}/merged.gtf \
+    --TSV \
+    --organismtag ${ORGANISMTAG} \
+    --species ${SPECIES} \
+    --dataset ${DATASET} \
+    --DAVID \
+    --DAVIDid ENSEMBL_GENE_ID \
+    --DAVIDuser ${DAVIDUSER} \
+    --host ${HOST}
+
+SHI
+EOF
+)
+# Close "for serie in $series; do" loop
+done
+
+echo "Waiting for adiff jobs${ids} to complete"
 srun --partition $SLURMPARTITION -d afterok${ids} echo "Tuxedo_v3 pipeline done."
 #### END section
 
