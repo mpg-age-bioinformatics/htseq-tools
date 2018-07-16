@@ -405,8 +405,6 @@ sbatch --partition $SLURMPARTITION --parsable << EOF
 ${SHIFTER} << SHI
 #!/bin/bash
 ${HOMESOURCE}
-# The $HOME export in .bashrc is not honored, thats why we have to make it explicit here
-export HOME=/beegfs/scratch/bruening_scratch/pklemm/shifter/home/
 
 # Install multiqc
 module load python
