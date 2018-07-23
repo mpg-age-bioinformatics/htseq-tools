@@ -81,7 +81,7 @@ mkdir -p ../stringtie_output
 mkdir -p ../cuffmerge_output
 mkdir -p ../cuffdiff_output
 mkdir -p ../cuffquant_output
-#mkdir -p ../featureCounts_output
+mkdir -p ../featureCounts_output
 mkdir -p ../multiqc_output
 mkdir -p ../seqc_output
 
@@ -335,7 +335,59 @@ done
 
 
 echo "Waiting for cuffquant jobs${ids} to complete"
-srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting cuffdiff."
+srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting featureCounts."
+
+#############################################################################
+
+echo "Starting featureCount"
+
+ids=
+
+for serie in $series; do
+
+    # Library settings for featureCounts
+
+    if [[ $(contains "${unstr[@]}" "$serie") == "y" ]]; then
+        featureCounts_direction=0
+    elif [[ $(contains "${str[@]}" "$serie") == "y" ]]; then
+        featureCounts_direction=2
+    elif [[ $(contains "${mix[@]}" "$serie") == "y" ]]; then
+        featureCounts_direction=0
+    fi
+
+    cd ${top}hisat_output
+    echo $(pwd)
+    for file in $(ls *${serie}*.bam); do 
+rm -rf ${logs}featureCount_${file::(-4)}.*.out
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --cpus-per-task=18
+#SBATCH -o ${logs}featureCount_${file::(-4)}.%j.out
+#SBATCH --job-name='featureCounts'
+module load shifter
+
+${SHIFTER} << SHI
+#!/bin/bash
+${HOMESOURCE}
+module load subread
+cd ${top}featureCounts_output
+mkdir ${serie}
+cd ${top}hisat_output
+echo "featureCounts -a $ori_GTF -T 18 -g gene_id -o ${top}featureCounts_output/${serie}/${file}_gene.featureCounts.txt -p -s $featureCounts_direction ${file}"
+featureCounts -a $ori_GTF -T 18 -g gene_id -o ${top}featureCounts_output/${serie}/${file}_gene.featureCounts.txt -p -s $featureCounts_direction ${file}
+echo "featureCounts -a $ori_GTF -T 18 -g gene_biotype -o ${top}featureCounts_output/${serie}/${file}_biotype.featureCounts.txt -p -s $featureCounts_direction ${file}"
+featureCounts -a $ori_GTF -T 18 -g gene_biotype -o ${top}featureCounts_output/${serie}/${file}_biotype.featureCounts.txt -p -s $featureCounts_direction ${file}
+cut -f 1,7 ${top}featureCounts_output/${serie}/${file}_biotype.featureCounts.txt | tail -n +3 | (echo "$biotypes_header" && cat) >> ${top}featureCounts_output/${serie}/${file}_biotype_counts_mqc.txt
+
+SHI
+EOF
+)
+    done
+done
+
+
+echo "Waiting for featureCounts jobs${ids} to complete"
+srun --partition $SLURMPARTITION -d afterok${ids} echo "featureCounts done. Starting cuffdiff."
 
 
 #############################################################################
