@@ -459,8 +459,8 @@ ${SHIFTER} << SHI
 ${HOMESOURCE}
 
 # Install multiqc
-module load python
-pip install multiqc --user
+module load python/3.6.5
+pip3 install multiqc --user --ignore-installed
 
 cd ${top}
 multiqc . -f -o ${mqc}
