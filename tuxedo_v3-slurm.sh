@@ -27,7 +27,7 @@ Make sure you have edited the last section of this script - cuffdiff - before yo
 # MPI-Age Settings
 HOMESOURCE="source ~/.bashrc"
 SLURMPARTITION="blade,himem,hugemem,dontuseme"
-SHIFTER="shifter --image=mpgagebioinformatics/bioinformatics_software:v1.1.0"
+SHIFTER="shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.1"
 SHIFTERSEQC="shifter --image=paulklemm/seqc"
 
 # MPI-MR Settings
