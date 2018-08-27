@@ -34,7 +34,7 @@ SHIFTERSEQC="shifter --image=paulklemm/seqc"
 # MPI-MR The $HOME export in .bashrc is not honored, thats why we have to make it explicit here
 #HOMESOURCE="source /beegfs/scratch/bruening_scratch/pklemm/shifter/home/.bashrc && HOME=/beegfs/scratch/bruening_scratch/pklemm/shifter/home/"
 #SLURMPARTITION="blade-b,highmem"
-#SHIFTER="/beegfs/bin/shifter/latest/bin/shifter --image=hub.age.mpg.de/bioinformatics/software:v1.1.9 bash"
+#SHIFTER="/beegfs/bin/shifter/latest/bin/shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.2 bash"
 #SHIFTERSEQC="/beegfs/bin/shifter/latest/bin/shifter --image=paulklemm/seqc bash"
 
 # TODO: Define series as SE or PE and stranded or unstranded
@@ -459,8 +459,8 @@ ${SHIFTER} << SHI
 ${HOMESOURCE}
 
 # Install multiqc
-module load python/3.6.5
-pip3 install multiqc --user --ignore-installed
+module load python
+pip install multiqc --user --ignore-installed
 
 cd ${top}
 multiqc . -f -o ${mqc}
