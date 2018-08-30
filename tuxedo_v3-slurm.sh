@@ -28,14 +28,14 @@ Make sure you have edited the last section of this script - cuffdiff - before yo
 HOMESOURCE="source ~/.bashrc"
 SLURMPARTITION="blade,himem,hugemem,dontuseme"
 SHIFTER="shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.1"
-SHIFTERSEQC="shifter --image=paulklemm/seqc"
+SHIFTERSEQC="shifter --image=index.docker.io/paulklemm/seqc"
 
 # MPI-MR Settings
 # MPI-MR The $HOME export in .bashrc is not honored, thats why we have to make it explicit here
 #HOMESOURCE="source /beegfs/scratch/bruening_scratch/pklemm/shifter/home/.bashrc && HOME=/beegfs/scratch/bruening_scratch/pklemm/shifter/home/"
 #SLURMPARTITION="blade-b,highmem"
 #SHIFTER="/beegfs/bin/shifter/latest/bin/shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.2 bash"
-#SHIFTERSEQC="/beegfs/bin/shifter/latest/bin/shifter --image=paulklemm/seqc bash"
+#SHIFTERSEQC="/beegfs/bin/shifter/latest/bin/shifter --image=index.docker.io/paulklemm/seqc bash"
 
 # TODO: Define series as SE or PE and stranded or unstranded
 SE_unstr=("YiTS" "YiDR" "YiIS" "ShTe")
