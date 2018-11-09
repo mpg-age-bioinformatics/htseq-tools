@@ -475,7 +475,7 @@ EOF
 #### Seqc of Cuffdiff result
 
 # Reset IDs
-ids=
+seqc_ids=
 
 for serie in $series; do
   # Set path for cuffdiff result of series
@@ -488,7 +488,7 @@ for serie in $series; do
   rm -rf ${logs}seqc.*.out
 
 # Slurm call for series
-ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+seqc_ids=${seqc_ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
 #!/bin/bash
 #SBATCH --cpus-per-task=1
 #SBATCH -o ${logs}seqc.%j.out
@@ -513,8 +513,6 @@ EOF
 # Close "for serie in $series; do" loop
 done
 
-echo "Waiting for seqc jobs${ids} to complete"
-srun --partition $SLURMPARTITION -d afterok${ids} echo "Seqc is done. Starting aDiff."
 #### END section
 
 #### aDiff of Cuffdiff results
@@ -569,7 +567,9 @@ EOF
 # Close "for serie in $series; do" loop
 done
 
-echo "Waiting for adiff jobs${ids} to complete"
+echo "Waiting for adiff jobs${ids} and seqc jobs${seqc_ids} to complete"
+
+srun --partition $SLURMPARTITION -d afterok${seqc_ids} echo "Seqc is done."
 srun --partition $SLURMPARTITION -d afterok${ids} echo "Tuxedo_v3 pipeline done."
 #### END section
 
