@@ -143,7 +143,7 @@ module load shifter
 ${SHIFTER} << SHI
 #!/bin/bash
 ${HOMESOURCE}
-module load fastqc
+module load jdk fastqc
 cd ${raw}
 # FASTQC call
 fastqc -t 4 -o ../fastqc_output ${file}
