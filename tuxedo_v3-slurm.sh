@@ -339,8 +339,8 @@ EOF
 done
 
 
-echo "Started cuffquant jobs${ids}"
-#srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting featureCounts."
+echo "Waiting for cuffquant jobs${ids} to complete"
+srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting featureCounts."
 
 #############################################################################
 
