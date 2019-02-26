@@ -27,7 +27,7 @@ Make sure you have edited the last section of this script - cuffdiff - before yo
 # MPI-Age Settings
 HOMESOURCE="source ~/.bashrc"
 SLURMPARTITION="blade,himem,hugemem,dontuseme"
-SHIFTER="shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.1"
+SHIFTER="shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.5 /bin/bash"
 SHIFTERSEQC="shifter --image=index.docker.io/paulklemm/seqc"
 
 # MPI-MR Settings
@@ -339,8 +339,8 @@ EOF
 done
 
 
-echo "Waiting for cuffquant jobs${ids} to complete"
-srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting featureCounts."
+echo "Started cuffquant jobs${ids}"
+#srun --partition $SLURMPARTITION -d afterok${ids} echo "Cuffquant done. Starting featureCounts."
 
 #############################################################################
 
