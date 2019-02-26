@@ -483,7 +483,7 @@ for serie in $series; do
   # Set seqc output path
   output_path=${top}seqc_output/${serie}
   # Create seqc outout path
-  mkdir $output_path
+  mkdir -p $output_path
   # Remove existing logs of seqc
   rm -rf ${logs}seqc.*.out
 
