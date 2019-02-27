@@ -460,9 +460,13 @@ ${HOMESOURCE}
 
 # Install multiqc
 module load python
-pip install multiqc --user --ignore-installed
+#pip install multiqc --user --ignore-installed
 
 cd ${top}
+pip install virtualenv --user
+virtualenv multiqc
+source multiqc/bin/activate
+pip install multiqc --ignore-installed  
 multiqc . -f -o ${mqc}
 
 SHI
