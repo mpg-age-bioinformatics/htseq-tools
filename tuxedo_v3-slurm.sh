@@ -464,6 +464,7 @@ module load python
 
 cd ${top}
 pip install virtualenv --user
+unset PYTHONHOME
 virtualenv multiqc
 source multiqc/bin/activate
 pip install multiqc --ignore-installed  
