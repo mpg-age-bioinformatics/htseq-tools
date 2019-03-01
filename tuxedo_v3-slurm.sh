@@ -466,6 +466,7 @@ cd ${top}
 pip install virtualenv --user
 unset PYTHONHOME
 virtualenv multiqc
+unset PYTHONUSERBASE
 source multiqc/bin/activate
 pip install multiqc --ignore-installed  
 multiqc . -f -o ${mqc}
@@ -550,7 +551,12 @@ ${SHIFTER} << SHI
 ${HOMESOURCE}
 cd ${top}
 module load python
-pip install AGEpy --user
+pip install virtualenv --user  
+unset PYTHONHOME  
+virtualenv agepy
+unset PYTHONUSERBASE 
+source agepy/bin/activate 
+pip install AGEpy
 # Run aDiff command
 aDiff \
     --inputFolder $cuffdiff_path \
