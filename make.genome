@@ -26,4 +26,7 @@ with open(output, "w") as fout:
                 seq=[]
             else:
                 seq.append(l)                   
-
+        seq="".join(seq)
+        print "##contig=<ID="+ref+",length="+str(len(seq))+">"
+        sys.stdout.flush()
+        fout.write(str(ref).split(" ")[0]+"\t"+str(len(seq))+"\n")
