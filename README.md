@@ -315,6 +315,21 @@ optional arguments:
                         Output directory (default: goplots_output)
 ```
 
+#### david_to_cellplot.R
+
+Create cellplot and symplot plots from david output.
+
+Usage:
+
+```
+./david_to_cellplot.R [infile] [fileype] [category] [nterms]
+```
+
+- filetype: `xlsx` `tsv` `csv` `txt`
+- category: anything present in the DAVID output file
+- nterms: number of terms to plot
+
+
 ## License
 
 Copyright 2016, Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing
