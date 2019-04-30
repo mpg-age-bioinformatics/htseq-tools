@@ -7,44 +7,37 @@ SLURMPARTITION="blade,himem,hugemem,dontuseme"
 SHIFTER="shifter --image=hub.age.mpg.de/bioinformatics/software:v2.0.6 /bin/bash"
 
 # reference genome
-genome_folder=/beegfs/common/genomes/caenorhabditis_elegans/91/
+genome_folder=/beegfs/common/genomes/homo_sapiens/95/
 gtf=${genome_folder}original.gtf
 chromosomes=${genome_folder}original.toplevel.genome
-
-# kallisto index -i Caenorhabditis_elegans.WBcel235.cdna.all.idx Caenorhabditis_elegans.WBcel235.cdna.all.fa
-kallisto_index=${genome_folder}kallisto/Caenorhabditis_elegans.WBcel235.cdna.all.idx
-
-# from https://genome.ucsc.edu/cgi-bin/hgTables?command=start
-# awk -F^chr '{ print $2 }' WBcel235.ce11.bed > WBcel235.ce11.ENSEMBL.bed
-# I to 1 nomenclature conversions might also be required for human and mouse references
-bed=${genome_folder}WBcel235.ce11.ENSEMBL.bed
+fasta=${genome_folder}original.primary_assembly.fa
 
 # files sufixes
 read1_sufix="-READ_1.fastq.gz"
-read2_sufix=none # if single, write "none"
+read2_sufix="-READ_2.fastq.gz" # if single, write "none"
 
 # "caenorhabditis elegans", "drosophila melanogaster", "mus musculus", "homo sapiens"
-species="caenorhabditis elegans"
+species="homo sapiens"
 
 # http://www.ensembl.org/info/website/archives/index.html
-biomart_host="http://dec2017.archive.ensembl.org/biomart/"
+biomart_host="http://jan2019.archive.ensembl.org/biomart/"
 
 # datasets "celegans_gene_ensembl" "dmelanogaster_gene_ensembl","mmusculus_gene_ensembl","hsapiens_gene_ensembl"
-biomart_dataset="celegans_gene_ensembl"
+biomart_dataset="hsapiens_gene_ensembl"
 
 # for single end reads in kalisto
 fragment_size=200
 fragment_size_standard_deviation=30
 
 # DAVID
-daviddatabase="WORMBASE_GENE_ID"
+daviddatabase="ENSEMBL_GENE_ID"
 DAVIDUSER="jorge.boucas@age.mpg.de"
 
 # cytoscape
-cytoscape_host="10.20.10.29"
+cytoscape_host="10.20.10.90"
 
 # samples, if paired only READ is required
-samplestable="/beegfs/group_bit/data/projects/departments/Adam_Antebi/AA_AndreaA_daf2/scripts.JBoucas/samples.andrea.kal_deseq2.xlsx"
+samplestable="/beegfs/group_bit/data/projects/departments/Bioinformatics/bit_Leo_cardio_dev/scripts.JBoucas/samples.leo.total.kal.deseq.xlsx"
 # and excel file with one sheet of the form
 #Files   daf2    treat
 #S_001-F_And2-L____wt-___-cont-REP_1-READ_1.fastq.gz wt  control
@@ -76,6 +69,7 @@ mkdir -p ../kallisto_output
 mkdir -p ../deseq2_output
 mkdir -p ../featureCounts_output_kal
 mkdir -p ../multiqc_output
+mkdir -p ../kallisto_index
 
 top=$(readlink -f ../)/
 tmp=$(readlink -f ../tmp)/
@@ -85,8 +79,31 @@ fqc=$(readlink -f ../fastqc_output)/
 kalout=$(readlink -f ../kallisto_output)/
 deg=$(readlink -f ../deseq2_output)/
 mqc=$(readlink -f ../multiqc_output)/
+ind=$(readlink -f ../kallisto_index)/
+cdna_fasta=${ind}transcripts.norRNA.fa
+kallisto_index=${ind}transcripts.norRNA.idx
+
 
 #############################################################################
+
+#echo "Prepare gene id to gene name reference table"
+echo "Extracting non rRNA transcripts"
+
+############################################################################# 
+
+
+if [ ! -e ${cdna_fasta} ] ; then 
+
+grep -v -i rrna ${gtf} > ${tmp}no.rRNA.gtf
+#echo "Done with grep"
+#module load gff
+# needs samtools faidx ${fasta}
+# https://github.com/gpertea/gffread
+~/gffread/gffread -w ${cdna_fasta} -g ${fasta} ${tmp}no.rRNA.gtf
+
+fi
+
+############################################################################# 
 
 echo "Determine paired vs single end sequencing"
 cd ${raw}
@@ -105,7 +122,9 @@ echo "Starting FASTQC"
 #############################################################################
 
 cd ${raw} 
-for file in $(ls *.fastq.gz); do 
+for file in $(ls *.fastq.gz | grep -v tmp ); do 
+
+if [ ! -e ../fastqc_output/${file%.fastq.gz}_fastqc.html ] ; then
 
 rm -rf ${logs}fastqc.${file%.fastq.gz}.*.*
 
@@ -127,7 +146,44 @@ fastqc -t 4 -o ../fastqc_output ${file}
 SHI
 EOF
 
+fi
+
 done
+
+#############################################################################
+
+echo "Building required index."
+
+#############################################################################
+
+if [ ! -e ${kallisto_index} ] ; then  
+
+rm -rf ${logs}kallisto.index.*.out
+
+id=$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --output ${logs}kallisto.index.%j.out
+#SBATCH -c 4
+#SBATCH --job-name="index"
+module load shifter
+
+${SHIFTER} << SHI
+#!/bin/bash
+${HOMESOURCE}
+
+module load kallisto 
+
+cd ${ind}
+
+kallisto index -i ${kallisto_index} ${cdna_fasta}
+
+SHI
+EOF
+)
+
+srun -d afterok:${id} echo "Done building Kallisto's index."
+
+fi
 
 #############################################################################
 
@@ -135,7 +191,26 @@ echo "Determining strandness"
 
 #############################################################################
 
+if [ ! -e ${raw}strandness.txt ] ; then
+
 rm -rf ${logs}strand.${test_read_1%${read1_sufix}}.*.out
+
+python << PYOF
+inGTF="${gtf}"
+outbed="${ind}gene.model.bed"
+bed=[]
+with open(inGTF, "r") as fin:
+    for line in fin:
+        if line[0] != "#":
+            l=line.split("\t")
+            if l[2] == "gene":
+                gene_id=l[8].split('gene_id "')[1].split('";')[0]
+                bedline=[l[0],l[3],l[4],gene_id, ".",l[6]]
+                bedline="\t".join(bedline)
+                bed.append(bedline)
+with open(outbed, "w") as fout:
+    fout.write("\n".join(bed))
+PYOF
 
 id=$(sbatch --partition $SLURMPARTITION --parsable << EOF
 #!/bin/bash
@@ -157,12 +232,15 @@ zcat ${test_read_1} | head -n 16000000 > tmp.${test_read_1}
 if [ "${seq}" == "paired" ]
 then 
 
+echo ${seq}
 zcat ${test_read_2} | head -n 16000000 > tmp.${test_read_2}
 kallisto quant -t 18 -i ${kallisto_index} --genomebam -g ${gtf} -c ${chromosomes} -o $(pwd)/tmp.${test_read_1%${read1_sufix}} -b 100 tmp.${test_read_1} tmp.${test_read_2}
-
+rm -rf tmp.${test_read_1} tmp.${test_read_2}
 else
 
+echo ${seq}
 kallisto quant -t 18 -i ${kallisto_index} --genomebam -g ${gtf} -c ${chromosomes} -o $(pwd)/tmp.${test_read_1%${read1_sufix}} -b 100 --single -l ${fragment_size} -s ${fragment_size_standard_deviation} tmp.${test_read_1}
+rm -rf tmp.${test_read_1}
 
 fi
 
@@ -175,7 +253,7 @@ virtualenv RSeQC
 unset PYTHONUSERBASE
 source RSeQC/bin/activate
 pip install RSeQC
-infer_experiment.py -i raw_data/tmp.${test_read_1%${read1_sufix}}/pseudoalignments.bam -r ${bed} > raw_data/infer_experiment.txt
+infer_experiment.py -i raw_data/tmp.${test_read_1%${read1_sufix}}/pseudoalignments.bam -r ${ind}gene.model.bed > raw_data/infer_experiment.txt
 
 python > raw_data/strandness.txt << PYOF
 import sys
@@ -213,16 +291,23 @@ EOF
 echo "Waiting for strandness determination job ${id} to complete."
 srun --partition $SLURMPARTITION -d afterok:${id} echo "Strandness determination complete."
 
+rm -rf ${raw}tmp.${test_read_1%${read1_sufix}}  
+
+fi
+
+
 #############################################################################
 
 strand=$(head -n 1 ${raw}strandness.txt) 
 echo "This is ${strand} data. Starting Kallisto."
+
 
 #############################################################################
 
 # kallisto
 
 #############################################################################
+
 
 
 cd ${raw}
@@ -233,13 +318,15 @@ elif [ "${strand}" == "fr-secondstrand" ] ; then
     kallisto_strand="--fr-stranded"
 elif [ "${strand}" == "unstranded" ] ; then
     kallisto_strand=""
-else:
+else
     exit
 fi
 
 ids=""
 
 for f in $(ls *${read1_sufix}* | grep -v tmp ) ; do
+
+if [ ! -e ${kalout}${f%${read1_sufix}}/pseudoalignments.bam ] ; then
 
 rm -rf ${logs}kallisto.${f%${read1_sufix}}.*.out
 
@@ -276,7 +363,15 @@ SHI
 EOF
 )
 
+fi
+
 done
+
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --output ${logs}empty.%j.out
+EOF
+)
 
 echo "Waiting for kallisto jobs ${ids} to complete."
 srun --partition $SLURMPARTITION -d afterok${ids} echo "Finished Kallisto. Starting featureCounts and multiqc."
@@ -301,6 +396,9 @@ ids=""
 cd ${top}kallisto_output
 echo $(pwd)
 for file in $(ls) ; do 
+
+if [ ! -e ${top}featureCounts_output_kal/${file}_biotype_counts_mqc.txt ] ; then
+
 rm -rf ${logs}featureCount_kal_${file}.*.out
 ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
 #!/bin/bash
@@ -323,13 +421,24 @@ cut -f 1,7 ${top}featureCounts_output_kal/${file}_biotype.featureCounts.txt | ta
 SHI
 EOF
 )
+
+fi
+
 done
+
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --output ${logs}empty.%j.out
+EOF
+)
 
 #############################################################################
 
 # MultiQC
 
 #############################################################################
+
+if [ ! -e ${top}multiqc_kallisto_output/multiqc_report.html ] ; then
 
 rm -rf ${logs}multiqc.*.out
 sbatch --partition $SLURMPARTITION -d afterok${ids} --parsable << EOF
@@ -349,21 +458,25 @@ module load python
 cd ${top}
 pip install virtualenv --user
 unset PYTHONHOME
-virtualenv multiqc
+virtualenv multiqc_kallisto
 unset PYTHONUSERBASE
-source multiqc/bin/activate
+source multiqc_kallisto/bin/activate
 pip install multiqc --ignore-installed  
-multiqc . -f -o ${mqc}
+multiqc fastqc_output/ featureCounts_output_kal/ kallisto_output/ -f -o multiqc_kallisto_output
 
 SHI
 EOF
 
+fi
 
 #############################################################################
 
 # DESeq2 part 1
 
 #############################################################################
+
+
+if [ ! -e ${deg}deseq2.part1.Rdata ] ; then  
 
 rm -rf ${logs}deseq2.*.out
 
@@ -452,7 +565,7 @@ for m in single_models:
 with open("${deg}models.txt", "w") as mout:
      mout.write("\n".join(textout))
 
-attributes=["ensembl_gene_id","gene_biotype","go_id","name_1006"]
+attributes=["ensembl_gene_id","go_id","name_1006"]
 server = BiomartServer( "${biomart_host}" )
 organism=server.datasets["${biomart_dataset}"]
 response=organism.search({"attributes":attributes})
@@ -460,11 +573,10 @@ response=response.content.decode().split("\n")
 response=[s.split("\t") for s in response ]
 bio_go=pd.DataFrame(response,columns=attributes)
 bio_go.to_csv("${deg}"+"annotated/biotypes_go_raw.txt", index=None, sep="\t")
-bio_go.columns = ["ensembl_gene_id","gene_biotype","GO_id","GO_term"]
+bio_go.columns = ["ensembl_gene_id","GO_id","GO_term"]
 
 def CombineAnn(df):
     return pd.Series(dict(ensembl_gene_id = "; ".join([ str(s) for s in list(set(df["ensembl_gene_id"]))  if str(s) != "nan" ] ) ,\
-                       gene_biotype = "; ".join([ str(s) for s in list(set(df["gene_biotype"])) if str(s) != "nan" ]), \
                        GO_id = "; ".join([ str(s) for s in list(set(df["GO_id"])) if str(s) != "nan" ] ) ,\
                        GO_term = "; ".join([ str(s) for s in list(set(df["GO_term"])) if str(s) != "nan" ] ) ,\
                       ) )
@@ -472,15 +584,23 @@ def CombineAnn(df):
 bio_go=bio_go.groupby(by="ensembl_gene_id", as_index=False).apply(CombineAnn)
 
 bio_go.reset_index(inplace=True, drop=True)
-bio_go.to_csv("${deg}"+"annotated/biotypes_go.txt", sep= "\t", index=None)
+#bio_go.to_csv("${deg}"+"annotated/biotypes_go.txt", sep= "\t", index=None)
 
 GTF=age.readGTF("${gtf}")
 GTF["gene_id"]=age.retrieve_GTF_field(field="gene_id",gtf=GTF)
 GTF["transcript_id"]=age.retrieve_GTF_field(field="transcript_id",gtf=GTF)
+GTF["gene_biotype"]=age.retrieve_GTF_field(field="gene_biotype",gtf=GTF)
 tx2gene=GTF[["transcript_id","gene_id"]].drop_duplicates()
 tx2gene.columns=["TXNAME","GENEID"]
-tx2gene.to_csv("${deg}"+"tx2gene.csv", quoting=1, index=None)
+tx2gene[["TXNAME","GENEID"]].to_csv("${deg}"+"tx2gene.csv", quoting=1, index=None)
+
+GTF=GTF[["gene_id","gene_biotype"]].drop_duplicates()
+GTF.columns=["ensembl_gene_id","gene_biotype"]
+bio_go=pd.merge(GTF,bio_go,on=["ensembl_gene_id"],how="outer")
+bio_go.to_csv("${deg}"+"annotated/biotypes_go.txt", sep= "\t", index=None)
 PYOF
+
+# see tx2gene.sh
 
 mkdir -p ${deg}annotated
 
@@ -511,8 +631,11 @@ SHI
 EOF
 )
 
+
 echo "Waiting for DESeq2 part 1 job ${id} to complete."
 srun --partition $SLURMPARTITION -d afterok:${id} echo "Finished DESeq2 part 1. Starting DESeq2 pair wise comparisons."
+
+fi
 
 #############################################################################
 
@@ -568,6 +691,8 @@ counts.dge <- counts.dge[order(counts.dge\$pvalue),]
 write.table(counts.dge, "${out}.results.tsv", sep="\t")
 EOF
 
+if [ ! -e ${out}.results.tsv ] ; then
+
 rm -rf ${logs}deseq2.${outs}.*.log
 
 ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
@@ -590,7 +715,15 @@ SHI
 EOF
 )
 
+fi
+
 done < ${deg}models.txt
+
+ids=${ids}:$(sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --output ${logs}empty.%j.out
+EOF
+)
 
 echo "Waiting for DESeq2 part 2 jobs ${ids} to complete."
 srun --partition $SLURMPARTITION -d afterok${ids} echo "Finished DESeq2 part 2. Starting annotation."
@@ -600,6 +733,8 @@ srun --partition $SLURMPARTITION -d afterok${ids} echo "Finished DESeq2 part 2. 
 # DESeq2 part 3 (annotations)
 
 #############################################################################
+
+if [ ! -e ${deg}annotated/significant.xlsx ] ; then
 
 rm -rf ${logs}annotate.deseq2.*.out
 
@@ -614,6 +749,12 @@ GTF["gene_name"]=age.retrieve_GTF_field(field="gene_name",gtf=GTF)
 id_name=GTF[["gene_id","gene_name"]].drop_duplicates()
 id_name.reset_index(inplace=True, drop=True)
 id_name.columns=["ensembl_gene_id","gene_name"]
+
+#id_name=pd.read_table("${ind}cdna.norRNA.tsv")
+#id_name=id_name[["gene_id","gene_symbol","description"]]
+#id_name.columns=["ensembl_gene_id","gene_name","description"]
+#id_name=id_name.drop_duplicates()
+#id_name.reset_index(inplace=True,drop=True)
 
 bio_go=pd.read_csv("${deg}"+"annotated/biotypes_go.txt", sep="\t")
 
@@ -665,6 +806,8 @@ EOF
 echo "Waiting for DESeq2 annotation part 1 job ${id} to complete."
 srun --partition $SLURMPARTITION -d afterok:${id} echo "Finished DESeq2 annotation. Starting  enrichment analysis."
 
+fi
+
 #############################################################################
 
 # DAVID
@@ -675,14 +818,22 @@ cd ${deg}annotated
 
 ids=""
 
-for f in $(ls *.results.tsv); do
+for f in $(ls *results.tsv); do
+
+    if [ ! -e ${deg}/annotated/${f%results.tsv}DAVID.tsv ] ; then   
+
     PY=${f%results.tsv}deseq2.p2.py
     cat > ${deg}${PY} << PYOF
 import pandas as pd
 import AGEpy as age
+import os 
+import sys
 
 deseq2="${deg}/annotated/"
 f="${f}"
+
+if os.path.isfile(deseq2+f.replace("results.tsv","DAVID.xlsx")):
+    sys.exit()
 
 df=pd.read_csv(deseq2+f,sep="\t")
 df=df[df["padj"]<0.05]
@@ -703,8 +854,9 @@ DAVID=age.DAVIDenrich(database="${daviddatabase}",\
 if type(DAVID) == type(pd.DataFrame()):
     #for c in DAVID.columns.tolist():
     #    DAVID[c]=DAVID[c].apply(lambda x: x.decode())
+    #print(DAVID.head(),DAVID["geneIds"].tolist(),names_dic )
     DAVID["genes name"]=DAVID["geneIds"].apply(lambda x: ", ".join([ names_dic[s.upper()] for s in x.split(", ") ] ) )
-    DAVID["genes fc"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(exp_dic[s.upper()]) for s in x.split(", ") ] ) )
+    #DAVID["genes fc"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(exp_dic[s.upper()]) for s in x.split(", ") ] ) )
 
     DAVID.to_csv(deseq2+f.replace("results.tsv","DAVID.tsv"), sep="\t", index=None)
     EXC=pd.ExcelWriter(deseq2+f.replace("results.tsv","DAVID.xlsx"))
@@ -735,7 +887,12 @@ python3 ${deg}${PY}
 SHI
 EOF
 )
+
+fi
+
 done
+
+exit
 
 #############################################################################
 
@@ -770,6 +927,10 @@ biomarthost="${biomart_host}"
 
 python_output="/".join(fin.split("/")[:-1])
 target=fin.replace("results.tsv","cytoscape")
+
+if os.path.isfile(target+".cys"):
+    sys.exit()
+
 
 taxons={"caenorhabditis elegans":"6239","drosophila melanogaster":"7227",\
        "mus musculus":"10090","homo sapiens":"9606"}
@@ -811,7 +972,9 @@ dfin["evidence"]=dfin["ensembl_gene_id"].apply(lambda x:CheckEvidence(x) )
 
 dfin["baseMean"]=dfin["baseMean"].apply(lambda x: np.log10(x))
 
-query_genes=dfin[dfin["padj"]<0.05]["ensembl_gene_id"].tolist()
+qdf=dfin[dfin["padj"]<0.05]
+qdf=qdf.sort_values(by=["padj"],ascending=True)
+query_genes=qdf["ensembl_gene_id"].tolist()[:1000]
 limit=int(len(query_genes)*.25)
 response=api("string", "protein query",\
                       {"query":",".join(query_genes),\
