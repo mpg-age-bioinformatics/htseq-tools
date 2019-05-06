@@ -855,7 +855,7 @@ if type(DAVID) == type(pd.DataFrame()):
     #for c in DAVID.columns.tolist():
     #    DAVID[c]=DAVID[c].apply(lambda x: x.decode())
     #print(DAVID.head(),DAVID["geneIds"].tolist(),names_dic )
-    DAVID["genes name"]=DAVID["geneIds"].apply(lambda x: ", ".join([ names_dic[s.upper()] for s in x.split(", ") ] ) )
+    DAVID["genes name"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(names_dic[s.upper()]) for s in x.split(", ") ] ) )
     #DAVID["genes fc"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(exp_dic[s.upper()]) for s in x.split(", ") ] ) )
 
     DAVID.to_csv(deseq2+f.replace("results.tsv","DAVID.tsv"), sep="\t", index=None)
