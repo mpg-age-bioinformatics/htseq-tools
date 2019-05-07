@@ -16,13 +16,13 @@ fasta=${genome_folder}original.primary_assembly.fa
 read1_sufix="-READ_1.fastq.gz"
 read2_sufix="-READ_2.fastq.gz" # if single, write "none"
 
-# "caenorhabditis elegans", "drosophila melanogaster", "mus musculus", "homo sapiens"
+# "caenorhabditis elegans", "drosophila melanogaster", "mus musculus", "homo sapiens", "saccharomyces cerevisiae"
 species="homo sapiens"
 
 # http://www.ensembl.org/info/website/archives/index.html
 biomart_host="http://jan2019.archive.ensembl.org/biomart/"
 
-# datasets "celegans_gene_ensembl" "dmelanogaster_gene_ensembl","mmusculus_gene_ensembl","hsapiens_gene_ensembl"
+# datasets "celegans_gene_ensembl" "dmelanogaster_gene_ensembl","mmusculus_gene_ensembl","hsapiens_gene_ensembl", "scerevisiae_gene_ensembl"
 biomart_dataset="hsapiens_gene_ensembl"
 
 # for single end reads in kalisto
@@ -80,6 +80,7 @@ kalout=$(readlink -f ../kallisto_output)/
 deg=$(readlink -f ../deseq2_output)/
 mqc=$(readlink -f ../multiqc_output)/
 ind=$(readlink -f ../kallisto_index)/
+scripts=$(readlink -f .)/
 cdna_fasta=${ind}transcripts.norRNA.fa
 kallisto_index=${ind}transcripts.norRNA.idx
 
@@ -252,6 +253,7 @@ rm -rf RSeQC
 virtualenv RSeQC
 unset PYTHONUSERBASE
 source RSeQC/bin/activate
+pip install numpy
 pip install RSeQC
 infer_experiment.py -i raw_data/tmp.${test_read_1%${read1_sufix}}/pseudoalignments.bam -r ${ind}gene.model.bed > raw_data/infer_experiment.txt
 
@@ -563,7 +565,7 @@ for m in single_models:
             textout.append(text)
         
 with open("${deg}models.txt", "w") as mout:
-     mout.write("\n".join(textout))
+     mout.write("\n".join(textout) + "\n")
 
 attributes=["ensembl_gene_id","go_id","name_1006"]
 server = BiomartServer( "${biomart_host}" )
@@ -856,7 +858,7 @@ if type(DAVID) == type(pd.DataFrame()):
     #    DAVID[c]=DAVID[c].apply(lambda x: x.decode())
     #print(DAVID.head(),DAVID["geneIds"].tolist(),names_dic )
     DAVID["genes name"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(names_dic[s.upper()]) for s in x.split(", ") ] ) )
-    #DAVID["genes fc"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(exp_dic[s.upper()]) for s in x.split(", ") ] ) )
+    DAVID["log2fc"]=DAVID["geneIds"].apply(lambda x: ", ".join([ str(exp_dic[s.upper()]) for s in x.split(", ") ] ) )
 
     DAVID.to_csv(deseq2+f.replace("results.tsv","DAVID.tsv"), sep="\t", index=None)
     EXC=pd.ExcelWriter(deseq2+f.replace("results.tsv","DAVID.xlsx"))
@@ -892,7 +894,9 @@ fi
 
 done
 
-exit
+echo "Waiting for DAVID annotation  job ${ids} to complete."
+srun --partition $SLURMPARTITION -d afterok:${ids} echo "Finished DAVID annotation. Starting cytoscape and drawing DAIVD plots."
+
 
 #############################################################################
 
@@ -909,7 +913,7 @@ import AGEpy as age
 import sys
 import os
 from py2cytoscape import cyrest
-from py2cytoscape.cyrest.base import api
+from py2cytoscape.cyrest.base import *
 import paramiko
 from time import sleep
 import matplotlib
@@ -933,11 +937,13 @@ if os.path.isfile(target+".cys"):
 
 
 taxons={"caenorhabditis elegans":"6239","drosophila melanogaster":"7227",\
-       "mus musculus":"10090","homo sapiens":"9606"}
+       "mus musculus":"10090","homo sapiens":"9606", "saccharomyces cerevisiae": "4932"}
 tags={"caenorhabditis elegans":"CEL","drosophila melanogaster":"DMEL",\
        "mus musculus":"MUS","homo sapiens":"HSA"}
 
 taxon_id=taxons[species]
+
+### ATTENTION ### if you are using yeast, you will need to uncomment the follwing lines 
 organismtag=tags[species]
 
 if not os.path.isfile(python_output+"/homdf.txt"):
@@ -952,6 +958,7 @@ homdf=pd.read_csv(python_output+"/homdf.txt", sep="\t")
 aging_genes=homdf[[organismtag+"_ensembl_gene_id","evidence"]].dropna()
 aging_genes=aging_genes[aging_genes[organismtag+"_ensembl_gene_id"]!="None"]
 aging_genes=aging_genes[organismtag+"_ensembl_gene_id"].tolist()
+### till here
 
 dfin=pd.read_csv(fin, sep="\\t")
 
@@ -968,6 +975,7 @@ def CheckEvidence(x,aging_genes=aging_genes):
         res="no"
     return res
 
+### also comment this line
 dfin["evidence"]=dfin["ensembl_gene_id"].apply(lambda x:CheckEvidence(x) )
 
 dfin["baseMean"]=dfin["baseMean"].apply(lambda x: np.log10(x))
@@ -1001,7 +1009,10 @@ cytoscape.vizmap.create_style(title="dataStyle",\
 sleep(2)
 cytoscape.vizmap.apply(styles="dataStyle")
 
+
 uploadtable=dfin[dfin["padj"]<0.05][["ensembl_gene_id","baseMean","log2FoldChange","evidence"]].dropna()
+# uploadtable=dfin[dfin["padj"]<0.05][["ensembl_gene_id","baseMean","log2FoldChange"]].dropna() ### use this line if you are using yeast
+
 cytoscape.table.loadTableData(uploadtable,df_key="ensembl_gene_id",table_key_column="query term")
 sleep(10)
 
@@ -1018,15 +1029,26 @@ NODE_FILL_COLOR=cytoscape.vizmap.mapVisualProperty(visualProperty="NODE_FILL_COL
                                                    center=[0.0,center_color],\
                                                    upper=[4,max_color])
 
+### do not do this if you are using yeast ...
 # apply diamond shape and increase node size to nodes with aging evidence
 NODE_SHAPE=cytoscape.vizmap.mapVisualProperty(visualProperty="NODE_SHAPE",mappingType="discrete",mappingColumn="evidence",\
                                               discrete=[ ["aging_gene","no"], ["DIAMOND", "ellipse"] ])
 NODE_SIZE=cytoscape.vizmap.mapVisualProperty(visualProperty="NODE_SIZE",mappingType="discrete",mappingColumn="evidence",\
                                              discrete=[ ["aging_gene","no"], ["100.0","60.0"] ])
+###
 cytoscape.vizmap.update_style("dataStyle",mappings=[NODE_SIZE,NODE_SHAPE,NODE_FILL_COLOR])
+# cytoscape.vizmap.update_style("dataStyle",mappings=[NODE_FILL_COLOR]) # if using yeast
+
 cytoscape.vizmap.apply(styles="dataStyle")
 
-basemean = cytoscape.table.getTable(table="node",columns=["baseMean"])
+network = "current"
+namespace='default'
+PARAMS=set_param(["columnList","namespace","network"],["SUID",namespace,network])
+network=api(namespace="network", command="get attribute",PARAMS=PARAMS, host=host,port='1234',version='v1')
+network=int(network[0]["SUID"])
+
+
+basemean = cytoscape.table.getTable(table="node",columns=["baseMean"], network = network)
 
 min_NormInt = min(basemean.dropna()["baseMean"].tolist())
 max_NormInt = max(basemean.dropna()["baseMean"].tolist())
@@ -1160,5 +1182,38 @@ EOF
 
 #############################################################################
 
+# Draw DAVID plots
+
+#############################################################################
+
+cd ${scripts}
+
+wget https://raw.githubusercontent.com/mpg-age-bioinformatics/htseq-tools/master/david_to_cellplot.R
+chmod 775 david_to_cellplot.R
 
 
+sbatch --partition $SLURMPARTITION --parsable << EOF
+#!/bin/bash
+#SBATCH --output ${logs}david_plot%j.out
+#SBATCH -c 2
+#SBATCH --job-name="david_plot"
+module load shifter
+
+
+for f in ${deg}/annotated/*DAVID.tsv ; do
+
+${SHIFTER} << SHI
+#!/bin/bash
+${HOMESOURCE}
+
+module load rlang
+
+Rscript david_to_cellplot.R ${f} tsv GOTERM_BP_FAT 15
+Rscript david_to_cellplot.R ${f} tsv KEGG_PATHWAY 15
+
+
+SHI
+done
+EOF
+
+exit

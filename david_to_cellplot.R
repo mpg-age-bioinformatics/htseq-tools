@@ -10,8 +10,12 @@ rm(list = ls())
 
 args<-commandArgs(TRUE)
 
-library(CellPlot)
+
+if (!require(readxl)) install.packages('readxl')
 library(readxl)
+
+if (!require(CellPlot)) devtools::install_github("dieterich-lab/CellPlot", build_vignettes = TRUE)
+library(CellPlot)
 
 # read in data, either excel or tsv
 # reformat input data
