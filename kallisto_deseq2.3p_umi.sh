@@ -45,7 +45,7 @@ DAVIDUSER="franziska.metge@age.mpg.de"
 cytoscape_host="192.168.50.166"
 
 # samples, if paired only READ is required
-samplestable="/beegfs/group_bit/data/projects/departments/Martin_Denzel/MD_Kira_a6CD34/scripts.FMetge/RNAseq_sample_sheet.xlsx"
+samplestable="/beegfs/group_bit/data/projects/departments/Bioinformatics/bit_test_kallisto_umitags/scripts.FMetge/RNAseq_sample_sheet.xlsx"
 # and excel file with one sheet of the form
 #Files   daf2    treat
 #S_001-F_And2-L____wt-___-cont-REP_1-READ_1.fastq.gz wt  control
@@ -78,6 +78,7 @@ mkdir -p ../deseq2_output
 mkdir -p ../featureCounts_output_kal
 mkdir -p ../multiqc_output
 mkdir -p ../kallisto_index
+mkdir -p ../raw_data
 
 top=$(readlink -f ../)/
 tmp=$(readlink -f ../tmp)/
@@ -328,10 +329,10 @@ rm -rf tmp.${test_read_1}
 
 fi
 
-module load python
+module load python/3.6.5
 cd ../
 unset PYTHONHOME
-pip install virtualenv --user
+pip3 install virtualenv --user
 rm -rf RSeQC  
 virtualenv RSeQC
 unset PYTHONUSERBASE
@@ -584,11 +585,11 @@ ${SHIFTER} << SHI
 ${HOMESOURCE}
 
 # Install multiqc
-module load python
+module load python/3.6.5
 #pip install multiqc --user --ignore-installed
 
 cd ${top}
-pip install virtualenv --user
+pip3 install virtualenv --user
 unset PYTHONHOME
 virtualenv multiqc_kallisto
 unset PYTHONUSERBASE
