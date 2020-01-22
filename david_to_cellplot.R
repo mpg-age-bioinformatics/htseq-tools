@@ -52,9 +52,10 @@ D$log2fc <-lapply( gsub('inf', 'Inf', D$log2fc), function(x) as.numeric(as.chara
 x <- D
 
 pdf(gsub(filetype, paste(category, '.cellplot.pdf', sep = ''), inFile))
-cell.plot(x = setNames(D$foldEnrichment, D$termName), 
+cell.plot(x = setNames(-log10(D$ease), D$termName), 
               cells = D$log2fc, 
-              main ="GO enrichment", 
+              main ="GO enrichment",
+              xlab ="-log10(P.Value)", 
               x.mar = c(max(unlist(lapply(D$termName, function(x) nchar(x))))/100 + 0.1,0),
               key.n = 7, 
               y.mar = c(0.1, 0.1), 
@@ -67,10 +68,11 @@ dev.off()
 
 # symplot
 pdf(gsub(filetype, paste(category, '.symplot.pdf', sep = ''), inFile))
-sym.plot(x = setNames(D$foldEnrichment, D$termName), 
+sym.plot(x = setNames(-log10(D$ease), D$termName), 
              cells = D$log2fc, 
              x.annotated = D$listHits, 
              main = "GO enrichment",
+             key.lab = "-log10(P.Value)",
              x.mar = c(max(unlist(lapply(D$termName, function(x) nchar(x))))/100 + 0.1, 0),
              y.mar = c(0.2,0.1),
              key.n = 7, 
