@@ -11,10 +11,13 @@ rm(list = ls())
 args<-commandArgs(TRUE)
 
 
+if (!require(devtools)) install.packages('devtools')
+library(devtools)
+
 if (!require(readxl)) install.packages('readxl')
 library(readxl)
 
-if (!require(CellPlot)) devtools::install_github("dieterich-lab/CellPlot", build_vignettes = TRUE)
+if (!require(CellPlot)) devtools::install_github("dieterich-lab/CellPlot")
 library(CellPlot)
 
 # read in data, either excel or tsv
