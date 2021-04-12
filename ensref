@@ -126,7 +126,6 @@ fi
 
 module purge
 echo "* loading software environment"
-module load slurm
 module load bowtie
 module load tophat
 module load bwa
@@ -229,7 +228,7 @@ do
   #[[ -f $FILE_UNZIP ]] && echo "exists" && continue
   [[ -f $FILE_REBASED ]] && echo "exists" && continue
   curl -#O $URL_GTF/$FILE
-  srun -p dontuseme gunzip $FILE
+  srun -p himem gunzip $FILE
   mv $FILE_UNZIP $FILE_REBASED
 done
 
@@ -246,7 +245,7 @@ do
   [[ -f ${FILE_REBASED} || -f ${FILE_CHROM} ]] && echo "exists" && continue
   [[ $FILE =~ nonchromosomal && -f chromosomes/nonchromosomal.fa ]] && echo "exists" && continue
   curl -#O $URL_DNA/$FILE
-  srun -p dontuseme gunzip $FILE
+  srun -p himem gunzip $FILE
   if [[ $FILE =~ chromosome ]]
   then
     mv $FILE_UNZIP $FILE_CHROM
@@ -301,7 +300,7 @@ echo done
 "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
+      sbatch -p himem -o log/${name}.log -J $jobname log/${name}.sh
     fi
   
     #######
@@ -327,7 +326,7 @@ echo done
   #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      pid_bowtie2=$(sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh)
+      pid_bowtie2=$(sbatch -p himem -o log/${name}.log -J $jobname log/${name}.sh)
       pid_bowtie2=${pid_bowtie2##* }
     fi
   
@@ -356,7 +355,7 @@ echo done
   "
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -p dontuseme -N 1 -o log/${name}.log -J $jobname -n 12 --mem=150GB log/${name}.sh
+      sbatch -p himem -N 1 -o log/${name}.log -J $jobname -n 12 --mem=150GB log/${name}.sh
     fi
 
 #    #######
@@ -382,7 +381,7 @@ echo done
 #  #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
 #      echo "$cmd" > log/${name}.sh
 #      chmod u+x log/${name}.sh
-#      sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
+#      sbatch -p himem -o log/${name}.log -J $jobname log/${name}.sh
 #    fi
 
 
@@ -410,7 +409,7 @@ echo done
   #bwa index -a bwtsw -p $TARGET/$name/${fa%.fa} $fa
       echo "$cmd" > log/${name}.sh
       chmod u+x log/${name}.sh
-      sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
+      sbatch -p himem -o log/${name}.log -J $jobname log/${name}.sh
     fi
   
     #######
@@ -458,9 +457,9 @@ echo done
       chmod u+x log/${name}.sh
       if [[ -n $pid_bowtie2 ]]
       then
-        sbatch -p dontuseme -o log/${name}.log -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
+        sbatch -p himem -o log/${name}.log -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
       else
-        sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
+        sbatch -p himem -o log/${name}.log -J $jobname log/${name}.sh
       fi
     fi
   
@@ -493,9 +492,9 @@ echo done
       chmod u+x log/${name}.sh
       if [[ -n $pid_bowtie2 ]]
       then
-        sbatch -p dontuseme -o log/${name}.log -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
+        sbatch -p himem -o log/${name}.log -J $jobname -d afterok:$pid_bowtie2 log/${name}.sh
       else
-        sbatch -p dontuseme -o log/${name}.log -J $jobname log/${name}.sh
+        sbatch -p himem -o log/${name}.log -J $jobname log/${name}.sh
       fi
     fi
 
