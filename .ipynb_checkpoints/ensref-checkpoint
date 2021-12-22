@@ -343,12 +343,12 @@ echo done
       jobname=ensref_${ORGANISM}_${RELEASE}_$name
       cmd="#!/bin/bash
 date
-which STARshort
+which STAR
 mkdir $name
 cd $name
 ln -s ../$fa index.fa
 ln -s ../$gtf index.gtf
-STARshort --runMode genomeGenerate --genomeDir ./ --genomeFastaFiles index.fa \
+STAR --runMode genomeGenerate --genomeDir ./ --genomeFastaFiles index.fa \
   --runThreadN 12 --sjdbGTFfile index.gtf --sjdbOverhang 100 \
   --limitGenomeGenerateRAM 124544990592
 echo done
