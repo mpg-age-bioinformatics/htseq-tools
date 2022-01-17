@@ -11,6 +11,8 @@ HOMESOURCE="source ~/.bashrc"
 SLURMPARTITION="hooli"
 SING="singularity exec /beegfs/common/singularity/bioinformatics_software.v3.0.9.sif /bin/bash"
 ### 
+
+
 ### legal
 
 # copyright (c) 2016, the Bioinformatics Core Facility of the Max Planck Institute for Biology of Ageing, Cologne
